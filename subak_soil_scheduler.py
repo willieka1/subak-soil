@@ -444,6 +444,16 @@ def solve_subak_schedule(
     """Solves the 15-day Super Seeder allocation schedule for a target district."""
     start_time = time.time()
 
+    try:
+        sharing_radius_km = float(getattr(sharing_radius_km, "default", sharing_radius_km))
+    except Exception:
+        sharing_radius_km = 18.0
+
+    try:
+        max_machines_per_cluster_day = int(getattr(max_machines_per_cluster_day, "default", max_machines_per_cluster_day))
+    except Exception:
+        max_machines_per_cluster_day = 15
+
     if df_or_path is None:
         df = load_subak_dataset()
     elif isinstance(df_or_path, str):

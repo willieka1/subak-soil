@@ -66,16 +66,26 @@ def health_check() -> Dict[str, Any]:
 
 @app.get("/api/optimize")
 def api_optimize(
-    district: str = Query("Sangrur", description="Target Punjab district"),
-    max_machines: int = Query(15, ge=5, le=30),
-    sharing_radius_km: float = Query(18.0, ge=5.0, le=40.0),
+    district: str = Query(default="Sangrur", description="Target Punjab district"),
+    max_machines: int = Query(default=15, ge=5, le=30),
+    sharing_radius_km: float = Query(default=18.0, ge=5.0, le=40.0),
 ) -> Dict[str, Any]:
+    # Unwrap default value if called directly as a Python function
+    dist_val = getattr(district, "default", district)
+    dist_str = str(dist_val if dist_val is not ... else "Sangrur")
+
+    mm_val = getattr(max_machines, "default", max_machines)
+    mm_int = int(mm_val if mm_val is not ... else 15)
+
+    sr_val = getattr(sharing_radius_km, "default", sharing_radius_km)
+    sr_float = float(sr_val if sr_val is not ... else 18.0)
+
     df = load_subak_dataset()
     schedule_df, summary = solve_subak_schedule(
         df,
-        district=district,
-        max_machines_per_cluster_day=max_machines,
-        sharing_radius_km=sharing_radius_km,
+        district=dist_str,
+        max_machines_per_cluster_day=mm_int,
+        sharing_radius_km=sr_float,
     )
     return {
         "summary": summary,
