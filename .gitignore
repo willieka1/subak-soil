@@ -1,5 +1,9 @@
-.venv/
 __pycache__/
-*.pyc
+*.py[cod]
+*$py.class
+.venv/
+venv/
 .env
+.vercel/
+.DS_Store
 subak_schedule_output.csv

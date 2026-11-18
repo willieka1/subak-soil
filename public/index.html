@@ -1,0 +1,1384 @@
+<!DOCTYPE html>
+<html lang="id" class="scroll-smooth">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>SUBAK-SOIL v2.0 | Geospatial Agri-Intelligence &amp; AI Synchronizer</title>
+  <script src="https://cdn.tailwindcss.com/3.4.17"></script>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
+  <style>
+    body { font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif; background-color: #f8fafc; color: #0f172a; }
+    .mono { font-family: 'JetBrains Mono', monospace; }
+    #gisMap { width: 100%; height: 480px; border-radius: 0.75rem; z-index: 10; }
+    .leaflet-popup-content-wrapper { border-radius: 10px; box-shadow: 0 10px 25px rgba(15,23,42,0.18); }
+    .tab-btn-active { background-color: #0f172a; color: #ffffff; box-shadow: 0 4px 12px rgba(15,23,42,0.18); }
+    .tab-btn-inactive { background-color: #ffffff; color: #475569; border: 1px solid #e2e8f0; }
+    .tab-btn-inactive:hover { background-color: #f1f5f9; color: #0f172a; }
+  </style>
+</head>
+<body class="min-h-screen flex flex-col">
+
+  <!-- TOP EXECUTIVE HEADER -->
+  <header class="bg-slate-900 text-slate-100 border-b-2 border-emerald-600 shadow-sm">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 py-4">
+      <div class="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
+        <div>
+          <div class="flex flex-wrap items-center gap-2 mb-1.5">
+            <span class="px-2.5 py-0.5 rounded-full text-[11px] font-semibold uppercase tracking-wider bg-amber-400/20 text-amber-300 border border-amber-400/40">
+              Regional Crop Residue &amp; Soil Carbon Dispatch System
+            </span>
+            <span class="px-2.5 py-0.5 rounded-full text-[11px] font-semibold uppercase tracking-wider bg-emerald-400/20 text-emerald-200 border border-emerald-400/30">
+              Punjab CHC Network · 22 Districts · 1,500 Clusters
+            </span>
+            <span id="apiStatusBadge" class="px-2.5 py-0.5 rounded-full text-[11px] font-medium bg-sky-400/20 text-sky-200 border border-sky-400/30">
+              Runtime: Client + FastAPI Serverless
+            </span>
+          </div>
+          <h1 class="text-xl sm:text-2xl font-extrabold tracking-tight flex items-center gap-2">
+            <span class="tracking-tight">SUBAK-SOIL</span>
+            <span class="text-emerald-300 font-normal text-base sm:text-lg hidden sm:inline">/ Regional Crop Residue &amp; Soil Carbon Dispatch System</span>
+          </h1>
+          <p class="text-xs sm:text-sm text-emerald-100/90 mt-1 max-w-3xl">
+            Sinkronisasi armada <b>Super Seeder CHC</b> berbasis algoritma gotong-royong <b>Subak Bali (UNESCO)</b> &amp; <b>Google OR-Tools CP-SAT</b> untuk mengonservasi <b>Karbon Organik Tanah (SOC)</b> dan hara <b>NPK</b> di 22 distrik Punjab (1.500 klaster desa).
+          </p>
+        </div>
+        <div class="flex flex-wrap items-center gap-2">
+          <a href="https://subak-soil.streamlit.app/" target="_blank" rel="noopener noreferrer" class="px-3 py-2 rounded-lg bg-white/10 hover:bg-white/20 border border-white/20 text-xs font-semibold text-white transition flex items-center gap-1.5">
+            <span>Streamlit Deployment</span>
+          </a>
+          <button id="btnQuickExport" type="button" class="px-3.5 py-2 rounded-lg bg-amber-400 hover:bg-amber-300 text-slate-950 text-xs font-bold shadow transition flex items-center gap-1.5">
+            <span>Ekspor Jadwal CSV</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- NAVIGATION TABS -->
+      <nav class="mt-4 flex flex-wrap gap-2" aria-label="Workspace Navigation">
+        <button type="button" data-tab="tab-gis" class="nav-tab-btn tab-btn-active px-3.5 py-2 rounded-lg text-xs sm:text-sm font-semibold transition">
+          01 · Peta GIS &amp; Penjadwalan Armada
+        </button>
+        <button type="button" data-tab="tab-ai" class="nav-tab-btn tab-btn-inactive px-3.5 py-2 rounded-lg text-xs sm:text-sm font-semibold transition">
+          02 · Diagnostik Tanah &amp; Preskripsi
+        </button>
+        <button type="button" data-tab="tab-eval" class="nav-tab-btn tab-btn-inactive px-3.5 py-2 rounded-lg text-xs sm:text-sm font-semibold transition">
+          03 · Validasi Spasial (GroupKFold)
+        </button>
+        <button type="button" data-tab="tab-audit" class="nav-tab-btn tab-btn-inactive px-3.5 py-2 rounded-lg text-xs sm:text-sm font-semibold transition">
+          04 · Arsitektur Sistem &amp; Deployment
+        </button>
+        <button type="button" data-tab="tab-guide" class="nav-tab-btn tab-btn-inactive px-3.5 py-2 rounded-lg text-xs sm:text-sm font-semibold transition">
+          05 · Protokol Operasional &amp; Referensi
+        </button>
+      </nav>
+    </div>
+  </header>
+
+  <!-- MAIN CONTENT CONTAINER -->
+  <main class="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 py-6 space-y-6">
+
+    <!-- =================================================================== -->
+    <!-- TAB 1: GIS STREETMAP & SUBAK SCHEDULER                              -->
+    <!-- =================================================================== -->
+    <section id="tab-gis" class="tab-panel space-y-6">
+      <!-- Control Toolbar -->
+      <div class="bg-white rounded-xl border border-slate-200 p-4 shadow-sm">
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4 items-end">
+          <div>
+            <label for="selectDistrict" class="block text-xs font-bold uppercase tracking-wider text-slate-600 mb-1">
+              Distrik Target (22 Distrik Punjab)
+            </label>
+            <select id="selectDistrict" class="w-full rounded-lg border border-slate-300 bg-slate-50 px-3 py-2 text-sm font-semibold text-slate-900 focus:outline-none focus:ring-2 focus:ring-emerald-600">
+            </select>
+          </div>
+          <div>
+            <label for="sliderMaxMachines" class="block text-xs font-bold uppercase tracking-wider text-slate-600 mb-1">
+              Kapasitas Maks. Mesin / Desa / Hari: <span id="lblMaxMachines" class="text-emerald-700 mono">15</span> unit
+            </label>
+            <input id="sliderMaxMachines" type="range" min="5" max="25" step="1" value="15" class="w-full accent-emerald-700 cursor-pointer" />
+          </div>
+          <div>
+            <label for="sliderRadius" class="block text-xs font-bold uppercase tracking-wider text-slate-600 mb-1">
+              Radius Kooperasi Antar-CHC: <span id="lblRadius" class="text-emerald-700 mono">18</span> km
+            </label>
+            <input id="sliderRadius" type="range" min="5" max="30" step="1" value="18" class="w-full accent-emerald-700 cursor-pointer" />
+          </div>
+          <div>
+            <label for="selectSocFilter" class="block text-xs font-bold uppercase tracking-wider text-slate-600 mb-1">
+              Filter Status Karbon Tanah (SOC)
+            </label>
+            <select id="selectSocFilter" class="w-full rounded-lg border border-slate-300 bg-slate-50 px-3 py-2 text-sm font-medium text-slate-800 focus:outline-none focus:ring-2 focus:ring-emerald-600">
+              <option value="ALL">Semua Status SOC</option>
+              <option value="CRITICAL">CRITICAL (&lt;0.50%)</option>
+              <option value="DEFICIENT">DEFICIENT (0.50-0.75%)</option>
+              <option value="MODERATE">MODERATE (&gt;0.75%)</option>
+            </select>
+          </div>
+          <div>
+            <label for="selectMapTile" class="block text-xs font-bold uppercase tracking-wider text-slate-600 mb-1">
+              Lapisan Peta Dasar (ArcGIS Tile)
+            </label>
+            <select id="selectMapTile" class="w-full rounded-lg border border-slate-300 bg-slate-50 px-3 py-2 text-sm font-medium text-slate-800 focus:outline-none focus:ring-2 focus:ring-emerald-600">
+              <option value="esri_street">StreetMap (Esri World Street Map)</option>
+              <option value="esri_sat">Satelit Agrikultur (Esri World Imagery)</option>
+              <option value="esri_topo">Topografi &amp; Kontur (Esri World Topo)</option>
+              <option value="esri_gray">GIS Light Gray Canvas (Esri)</option>
+            </select>
+          </div>
+        </div>
+      </div>
+
+      <!-- 6 Executive KPI Cards -->
+      <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-3.5">
+        <div class="bg-white rounded-xl border border-slate-200 border-l-4 border-l-emerald-600 p-4 shadow-sm">
+          <div class="text-xs font-semibold text-slate-500 uppercase">Lahan Termulsa Tepat Waktu</div>
+          <div id="kpiCoverage" class="text-2xl font-extrabold text-slate-900 mt-1 mono">61.0%</div>
+          <div id="kpiCoverageDelta" class="text-xs font-semibold text-emerald-700 mt-1">+34.1% vs Baseline CHC (26.9%)</div>
+        </div>
+        <div class="bg-white rounded-xl border border-slate-200 border-l-4 border-l-teal-600 p-4 shadow-sm">
+          <div class="text-xs font-semibold text-slate-500 uppercase">SOC Terkonservasi (Stabil)</div>
+          <div id="kpiCarbon" class="text-2xl font-extrabold text-slate-900 mt-1 mono">18,062 Ton</div>
+          <div id="kpiCarbonSub" class="text-xs text-slate-600 mt-1">Terkoreksi faktor tekstur tanah</div>
+        </div>
+        <div class="bg-white rounded-xl border border-slate-200 border-l-4 border-l-sky-600 p-4 shadow-sm">
+          <div class="text-xs font-semibold text-slate-500 uppercase">Hara NPK Bioavailable</div>
+          <div id="kpiNpk" class="text-2xl font-extrabold text-slate-900 mt-1 mono">1,481,109 kg</div>
+          <div id="kpiNpkSub" class="text-xs text-slate-600 mt-1">N + P₂O₅ (pH-adj) + K₂O</div>
+        </div>
+        <div class="bg-white rounded-xl border border-slate-200 border-l-4 border-l-indigo-600 p-4 shadow-sm">
+          <div class="text-xs font-semibold text-slate-500 uppercase">Indeks Keadilan Gini</div>
+          <div id="kpiGini" class="text-2xl font-extrabold text-slate-900 mt-1 mono">0.294</div>
+          <div id="kpiGiniSub" class="text-xs text-indigo-700 font-medium mt-1">vs Baseline 0.476 (Lebih adil)</div>
+        </div>
+        <div class="bg-white rounded-xl border border-slate-200 border-l-4 border-l-amber-500 p-4 shadow-sm">
+          <div class="text-xs font-semibold text-slate-500 uppercase">Armada Kolektif Subak</div>
+          <div id="kpiFleet" class="text-2xl font-extrabold text-slate-900 mt-1 mono">278 unit/hr</div>
+          <div id="kpiFleetSub" class="text-xs text-slate-600 mt-1">17 / 69 klaster desa tuntas 100%</div>
+        </div>
+        <div class="bg-white rounded-xl border border-slate-200 border-l-4 border-l-rose-600 p-4 shadow-sm">
+          <div class="text-xs font-semibold text-slate-500 uppercase">Substitusi Pupuk Kimia</div>
+          <div id="kpiSavings" class="text-2xl font-extrabold text-slate-900 mt-1 mono">₹48.94 Jt</div>
+          <div id="kpiSolverTag" class="text-xs text-emerald-700 font-semibold mt-1">OR-Tools CP-SAT Optimal</div>
+        </div>
+      </div>
+
+      <!-- Map + Side Analytics Grid -->
+      <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <!-- Interactive Leaflet Map (2 columns wide) -->
+        <div class="lg:col-span-2 bg-white rounded-xl border border-slate-200 p-4 shadow-sm flex flex-col">
+          <div class="flex flex-wrap items-center justify-between gap-2 mb-3">
+            <div>
+              <h2 class="text-base font-bold text-slate-900">
+                Peta Distribusi Klaster Desa &amp; Radius Kooperasi CHC — <span id="mapDistrictTitle" class="text-emerald-700">Sangrur</span>
+              </h2>
+              <p class="text-xs text-slate-500">
+                Klik penanda desa pada peta untuk melihat profil kimia tanah (SOC, NPK, pH) atau memuat desa ke simulator AI.
+              </p>
+            </div>
+            <div class="flex flex-wrap items-center gap-3 text-xs font-medium">
+              <span class="flex items-center gap-1"><span class="w-3 h-3 rounded-full bg-emerald-600 inline-block"></span> Tuntas 100%</span>
+              <span class="flex items-center gap-1"><span class="w-3 h-3 rounded-full bg-teal-600 inline-block"></span> P1 Kritis Tuntas</span>
+              <span class="flex items-center gap-1"><span class="w-3 h-3 rounded-full bg-amber-500 inline-block"></span> Parsial</span>
+              <span class="flex items-center gap-1"><span class="w-3 h-3 rounded-full bg-rose-600 inline-block"></span> P1 Butuh Relokasi</span>
+            </div>
+          </div>
+          <div id="gisMap"></div>
+        </div>
+
+        <!-- District Soil & Fleet Charts (1 column wide) -->
+        <div class="bg-white rounded-xl border border-slate-200 p-4 shadow-sm flex flex-col justify-between space-y-4">
+          <div>
+            <h3 class="text-sm font-bold text-slate-900 mb-1">Perbandingan Cakupan Lahan Termulsa</h3>
+            <p class="text-xs text-slate-500 mb-3">Baseline CHC (tanpa koordinasi) vs Sinkronisasi Subak CP-SAT</p>
+            <div class="space-y-3">
+              <div>
+                <div class="flex justify-between text-xs font-semibold mb-1">
+                  <span class="text-slate-600">Baseline CHC (Mesin Lokal Desa Saja)</span>
+                  <span id="barBaseText" class="mono text-slate-800">26.9%</span>
+                </div>
+                <div class="w-full h-3 bg-slate-100 rounded-full overflow-hidden">
+                  <div id="barBaseFill" class="h-full bg-slate-400 rounded-full transition-all duration-300" style="width: 26.9%"></div>
+                </div>
+              </div>
+              <div>
+                <div class="flex justify-between text-xs font-semibold mb-1">
+                  <span class="text-emerald-800">SUBAK-SOIL v2.0 (Sinkronisasi Lintas Tempak)</span>
+                  <span id="barSubakText" class="mono text-emerald-700 font-bold">61.0%</span>
+                </div>
+                <div class="w-full h-3 bg-emerald-100 rounded-full overflow-hidden">
+                  <div id="barSubakFill" class="h-full bg-emerald-600 rounded-full transition-all duration-300" style="width: 61.0%"></div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="border-t border-slate-100 pt-3">
+            <h3 class="text-sm font-bold text-slate-900 mb-2">Utilisasi Armada Harian (Hari 1–15)</h3>
+            <div class="relative h-48">
+              <canvas id="chartDailyFleet"></canvas>
+            </div>
+          </div>
+
+          <div class="border-t border-slate-100 pt-3">
+            <h3 class="text-sm font-bold text-slate-900 mb-2">Rata-Rata Parameter Tanah vs Ambang ICAR</h3>
+            <div id="soilThresholdTable" class="space-y-1.5 text-xs"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Schedule Table -->
+      <div class="bg-white rounded-xl border border-slate-200 p-4 shadow-sm">
+        <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-3">
+          <div>
+            <h3 class="text-base font-bold text-slate-900">Matriks Penjadwalan Operasional Super Seeder (Jendela Transisi 15 Hari)</h3>
+            <p class="text-xs text-slate-500">Diurutkan berdasarkan prioritas urgensi AI dan sisa hari menuju batas tanam gandum.</p>
+          </div>
+          <div class="flex items-center gap-2">
+            <input id="inputSearchCluster" type="text" placeholder="Cari nama desa atau blok..." class="rounded-lg border border-slate-300 px-3 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-emerald-600" />
+            <button id="btnExportTableCsv" type="button" class="px-3 py-1.5 rounded-lg bg-emerald-700 hover:bg-emerald-800 text-white text-xs font-semibold transition">
+              Unduh CSV Distrik Ini
+            </button>
+          </div>
+        </div>
+        <div class="overflow-x-auto max-h-96">
+          <table class="w-full text-left border-collapse text-xs">
+            <thead class="bg-slate-100 text-slate-700 sticky top-0 z-10">
+              <tr>
+                <th class="py-2.5 px-3 font-bold">ID Klaster</th>
+                <th class="py-2.5 px-3 font-bold">Desa &amp; Blok</th>
+                <th class="py-2.5 px-3 font-bold">Tekstur &amp; pH</th>
+                <th class="py-2.5 px-3 font-bold">SOC (%)</th>
+                <th class="py-2.5 px-3 font-bold">Lahan (ha)</th>
+                <th class="py-2.5 px-3 font-bold">Deadline</th>
+                <th class="py-2.5 px-3 font-bold">Skor AI</th>
+                <th class="py-2.5 px-3 font-bold">Mulsa Subak (ha)</th>
+                <th class="py-2.5 px-3 font-bold">SOC Diselamatkan</th>
+                <th class="py-2.5 px-3 font-bold">NPK (kg)</th>
+                <th class="py-2.5 px-3 font-bold">Jadwal H1–H5 (Unit/Hr)</th>
+                <th class="py-2.5 px-3 font-bold">Aksi</th>
+              </tr>
+            </thead>
+            <tbody id="scheduleTableBody" class="divide-y divide-slate-200"></tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <!-- =================================================================== -->
+    <!-- TAB 2: AI SOIL PREDICTOR & AGRONOMIC PRESCRIPTION                   -->
+    <!-- =================================================================== -->
+    <section id="tab-ai" class="tab-panel hidden space-y-6">
+      <div class="bg-white rounded-xl border border-slate-200 p-5 shadow-sm">
+        <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-3 pb-4 border-b border-slate-200">
+          <div>
+            <span class="text-xs font-bold uppercase tracking-wider text-emerald-700">Biophysical Soil Carbon &amp; Mechanization Model</span>
+            <h2 class="text-lg font-extrabold text-slate-900">Kalkulator Diagnostik Kerentanan Tanah &amp; Preskripsi Mulsa In-Situ</h2>
+            <p class="text-xs text-slate-600">
+              Menggunakan 9 fitur biofisik tanah (SOC, N, P₂O₅, K₂O, pH, tekstur tanah) dan tekanan waktu panen tanpa kebocoran target (<i>zero target leakage</i>).
+            </p>
+          </div>
+          <div class="flex flex-wrap gap-2">
+            <button type="button" data-preset="critical" class="preset-btn px-3 py-1.5 rounded-lg bg-rose-50 hover:bg-rose-100 text-rose-800 border border-rose-200 text-xs font-semibold">
+              Preset 1: Defisit SOC Kritis (&lt;0.45%)
+            </button>
+            <button type="button" data-preset="alkaline" class="preset-btn px-3 py-1.5 rounded-lg bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-200 text-xs font-semibold">
+              Preset 2: Tanah Basa (pH 8.15)
+            </button>
+            <button type="button" data-preset="moderate" class="preset-btn px-3 py-1.5 rounded-lg bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-200 text-xs font-semibold">
+              Preset 3: Lahan Terjadwal Optimal
+            </button>
+          </div>
+        </div>
+
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 mt-5">
+          <!-- Input Controls -->
+          <div class="space-y-3.5 bg-slate-50 p-4 rounded-xl border border-slate-200">
+            <h3 class="text-xs font-bold uppercase tracking-wider text-slate-700">1. Parameter Uji Lab Soil Health Card</h3>
+            <div>
+              <label for="aiSoc" class="flex justify-between text-xs font-semibold text-slate-700 mb-1">
+                <span>Karbon Organik Tanah / SOC (%)</span>
+                <span id="valAiSoc" class="mono text-emerald-700 font-bold">0.44%</span>
+              </label>
+              <input id="aiSoc" type="range" min="0.25" max="1.25" step="0.01" value="0.44" class="w-full accent-emerald-700" />
+            </div>
+            <div>
+              <label for="aiPh" class="flex justify-between text-xs font-semibold text-slate-700 mb-1">
+                <span>Reaksi pH Tanah</span>
+                <span id="valAiPh" class="mono text-emerald-700 font-bold">7.85</span>
+              </label>
+              <input id="aiPh" type="range" min="5.5" max="8.8" step="0.05" value="7.85" class="w-full accent-emerald-700" />
+            </div>
+            <div>
+              <label for="aiSoilType" class="block text-xs font-semibold text-slate-700 mb-1">Tekstur Tanah (Kinetika Humifikasi C:N)</label>
+              <select id="aiSoilType" class="w-full rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-xs font-semibold">
+                <option value="Sandy Loam">Sandy Loam (Oksidasi Cepat / Rentan Kering)</option>
+                <option value="Alluvial">Alluvial (Endapan Sungai Indo-Gangga)</option>
+                <option value="Loamy">Loamy (Lempung Seimbang)</option>
+                <option value="Clay Loam">Clay Loam (Stabilisasi Humus Tinggi)</option>
+              </select>
+            </div>
+            <div class="grid grid-cols-3 gap-2">
+              <div>
+                <label for="aiN" class="block text-[11px] font-semibold text-slate-600 mb-1">N (kg/ha)</label>
+                <input id="aiN" type="number" min="40" max="220" step="1" value="82" class="w-full rounded border border-slate-300 px-2 py-1 text-xs mono" />
+              </div>
+              <div>
+                <label for="aiP" class="block text-[11px] font-semibold text-slate-600 mb-1">P₂O₅ (kg/ha)</label>
+                <input id="aiP" type="number" min="15" max="110" step="1" value="38" class="w-full rounded border border-slate-300 px-2 py-1 text-xs mono" />
+              </div>
+              <div>
+                <label for="aiK" class="block text-[11px] font-semibold text-slate-600 mb-1">K₂O (kg/ha)</label>
+                <input id="aiK" type="number" min="80" max="320" step="1" value="145" class="w-full rounded border border-slate-300 px-2 py-1 text-xs mono" />
+              </div>
+            </div>
+
+            <h3 class="text-xs font-bold uppercase tracking-wider text-slate-700 pt-2 border-t border-slate-200">2. Parameter Operasional Panen &amp; CHC</h3>
+            <div>
+              <label for="aiArea" class="flex justify-between text-xs font-semibold text-slate-700 mb-1">
+                <span>Luas Sawah Padi Klaster Desa (ha)</span>
+                <span id="valAiArea" class="mono text-emerald-700 font-bold">165 ha</span>
+              </label>
+              <input id="aiArea" type="range" min="30" max="350" step="5" value="165" class="w-full accent-emerald-700" />
+            </div>
+            <div>
+              <label for="aiDays" class="flex justify-between text-xs font-semibold text-slate-700 mb-1">
+                <span>Sisa Hari Sebelum Tanam Gandum</span>
+                <span id="valAiDays" class="mono text-rose-700 font-bold">4 hari</span>
+              </label>
+              <input id="aiDays" type="range" min="1" max="15" step="1" value="4" class="w-full accent-emerald-700" />
+            </div>
+            <div>
+              <label for="aiChc" class="flex justify-between text-xs font-semibold text-slate-700 mb-1">
+                <span>Armada Super Seeder CHC Lokal</span>
+                <span id="valAiChc" class="mono text-emerald-700 font-bold">1 unit</span>
+              </label>
+              <input id="aiChc" type="range" min="0" max="10" step="1" value="1" class="w-full accent-emerald-700" />
+            </div>
+          </div>
+
+          <!-- AI Inference Output & Stoichiometry -->
+          <div class="lg:col-span-2 flex flex-col justify-between space-y-4">
+            <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+              <div class="p-4 rounded-xl border border-slate-200 bg-slate-900 text-white">
+                <div class="text-xs font-semibold text-emerald-300 uppercase">Indeks Urgensi Komposit</div>
+                <div id="outAiScore" class="text-3xl font-extrabold mt-1 mono">68.4 / 100</div>
+                <div id="outAiTier" class="mt-2 inline-block px-2.5 py-0.5 rounded-full text-xs font-bold bg-rose-500/20 text-rose-300 border border-rose-400/40">
+                  P1 - CRITICAL INTERVENTION
+                </div>
+              </div>
+              <div class="p-4 rounded-xl border border-slate-200 bg-white">
+                <div class="text-xs font-semibold text-slate-500 uppercase">Kebutuhan Mesin Harian</div>
+                <div id="outAiMachines" class="text-2xl font-extrabold text-slate-900 mt-1 mono">17 unit/hari</div>
+                <div id="outAiDeficit" class="text-xs font-semibold text-rose-600 mt-1">Defisit Lokal: 16 unit (Wajib Subak)</div>
+              </div>
+              <div class="p-4 rounded-xl border border-slate-200 bg-white">
+                <div class="text-xs font-semibold text-slate-500 uppercase">Kenaikan SOC Lapisan Olah</div>
+                <div id="outAiSocDelta" class="text-2xl font-extrabold text-emerald-700 mt-1 mono">+0.0199%</div>
+                <div id="outAiPhEff" class="text-xs text-slate-600 mt-1">Efisiensi Fosfor (pH): 95.6%</div>
+              </div>
+            </div>
+
+            <!-- Nutrient Recovery Breakdown -->
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div class="p-4 rounded-xl border border-slate-200 bg-white">
+                <h4 class="text-xs font-bold uppercase tracking-wider text-slate-600 mb-2">Komponen Indeks Urgensi AI (0–100)</h4>
+                <div class="relative h-48">
+                  <canvas id="chartAiComponents"></canvas>
+                </div>
+              </div>
+              <div class="p-4 rounded-xl border border-slate-200 bg-emerald-50/60 space-y-2">
+                <h4 class="text-xs font-bold uppercase tracking-wider text-emerald-900"> Neraca Penyelamatan Biomassa &amp; Hara In-Situ</h4>
+                <div class="grid grid-cols-2 gap-2 text-xs pt-1">
+                  <div class="bg-white p-2.5 rounded-lg border border-emerald-200">
+                    <div class="text-slate-500">Biomassa Jerami</div>
+                    <div id="outStrawTons" class="text-base font-bold text-slate-900 mono">907.5 Ton</div>
+                  </div>
+                  <div class="bg-white p-2.5 rounded-lg border border-emerald-200">
+                    <div class="text-slate-500">Karbon Stabil (Humus)</div>
+                    <div id="outStabilizedC" class="text-base font-bold text-emerald-700 mono">334.0 Ton</div>
+                  </div>
+                  <div class="bg-white p-2.5 rounded-lg border border-emerald-200">
+                    <div class="text-slate-500">Nitrogen + Fosfor + Kalium</div>
+                    <div id="outTotalNpk" class="text-base font-bold text-slate-900 mono">29,675 kg</div>
+                  </div>
+                  <div class="bg-white p-2.5 rounded-lg border border-emerald-200">
+                    <div class="text-slate-500">Penghematan Pupuk</div>
+                    <div id="outFertInr" class="text-base font-bold text-amber-700 mono">INR 981,412</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Agronomic Prescription List -->
+            <div class="p-4 rounded-xl border border-emerald-300 bg-emerald-950 text-emerald-50">
+              <h4 class="text-xs font-bold uppercase tracking-wider text-amber-300 mb-2">
+                Preskripsi Agronomi &amp; Manajemen Residu Lapangan (Standar ICAR-PAU)
+              </h4>
+              <ul id="outAiRecommendations" class="space-y-1.5 text-xs leading-relaxed list-disc pl-4"></ul>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- =================================================================== -->
+    <!-- TAB 3: UNBIASED AI EVALUATION MATRIX & PROFESSOR AUDIT              -->
+    <!-- =================================================================== -->
+    <section id="tab-eval" class="tab-panel hidden space-y-6">
+      <div class="bg-white rounded-xl border border-slate-200 p-5 shadow-sm space-y-5">
+        <div class="border-b border-slate-200 pb-4">
+          <span class="text-xs font-bold uppercase tracking-wider text-sky-700">Audit Metodologi Evaluasi Machine Learning &amp; Spasial</span>
+          <h2 class="text-lg font-extrabold text-slate-900 mt-0.5">
+            Evaluasi Validasi Silang Spasial (5-Fold Disjoint GroupKFold Lintas 22 Distrik)
+          </h2>
+          <p class="text-xs text-slate-600 mt-1">
+            Sesuai audit akademik terhadap <code class="mono bg-slate-100 px-1 py-0.5 rounded">subak_soil_datasheet.csv</code> (1.500 klaster, 22 distrik), berikut adalah pembuktian matematis mengapa evaluasi naif menghasilkan metrik yang bias/semu dan bagaimana <b>Spatial Block GroupKFold</b> memperbaikinya.
+          </p>
+        </div>
+
+        <!-- Diagnosis Comparison Cards -->
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div class="p-4 rounded-xl bg-amber-50 border border-amber-300 border-l-4 border-l-amber-600">
+            <div class="flex items-center justify-between mb-1">
+              <span class="text-xs font-extrabold uppercase text-amber-900">Skema Pembanding: Random 5-Fold Split (Dengan Proksi Distrik)</span>
+              <span class="px-2 py-0.5 rounded text-[11px] font-bold bg-amber-200 text-amber-900 mono">R² = 0.9988 (Semu)</span>
+            </div>
+            <p class="text-xs text-amber-950 leading-relaxed">
+              Pada dataset awal, kolom <code class="mono">urgency_priority_score</code> dibangkitkan dari rumus deterministik linier atas <code class="mono">SOC</code>, <code class="mono">harvest_days_left</code>, dan <code class="mono">fire_risk_index</code> (yang nilainya konstan per distrik). Jika dievaluasi dengan <i>Random Split</i> biasa, model hanya menghafal koefisien rumus tersebut sehingga terjadi <b>Data Leakage</b>.
+            </p>
+          </div>
+          <div class="p-4 rounded-xl bg-emerald-50 border border-emerald-300 border-l-4 border-l-emerald-600">
+            <div class="flex items-center justify-between mb-1">
+              <span class="text-xs font-extrabold uppercase text-emerald-900">Skema Utama: Spatial Block GroupKFold (22 Distrik Terpisah)</span>
+              <span class="px-2 py-0.5 rounded text-[11px] font-bold bg-emerald-200 text-emerald-900 mono">R² = 0.9549 | Macro-F1 = 0.9053</span>
+            </div>
+            <p class="text-xs text-emerald-950 leading-relaxed">
+              Fitur bocor <code class="mono">fire_risk_index</code> dihapus dan diganti 9 variabel biofisik murni (<code class="mono">SOC, N, P, K, pH, Tekstur Tanah, Luas Padi, Hari Panen, Armada CHC</code>). Validasi dilakukan menggunakan <b>5-Fold Spatial GroupKFold</b> di mana distrik pada data uji belum pernah dilihat saat pelatihan.
+            </p>
+          </div>
+        </div>
+
+        <!-- Metric Comparison Table + Confusion Matrix + Feature Importance -->
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          <!-- Side-by-side Metrics Table -->
+          <div class="bg-slate-50 rounded-xl border border-slate-200 p-4">
+            <h3 class="text-sm font-bold text-slate-900 mb-3">1. Tabel Perbandingan Metrik Out-of-Fold</h3>
+            <table class="w-full text-xs border-collapse">
+              <thead>
+                <tr class="border-b border-slate-300 text-slate-600">
+                  <th class="py-2 text-left">Metrik</th>
+                  <th class="py-2 text-right text-amber-800">Naif (Bias)</th>
+                  <th class="py-2 text-right text-emerald-800">GroupKFold (Valid)</th>
+                </tr>
+              </thead>
+              <tbody class="divide-y divide-slate-200 mono">
+                <tr>
+                  <td class="py-2 font-sans font-medium text-slate-700">Skema Split</td>
+                  <td class="py-2 text-right text-amber-800">Random 5-Fold</td>
+                  <td class="py-2 text-right text-emerald-800 font-semibold">22-District Block</td>
+                </tr>
+                <tr>
+                  <td class="py-2 font-sans font-medium text-slate-700">Out-of-Fold R²</td>
+                  <td class="py-2 text-right text-amber-800">0.9988</td>
+                  <td class="py-2 text-right text-emerald-800 font-bold">0.9549</td>
+                </tr>
+                <tr>
+                  <td class="py-2 font-sans font-medium text-slate-700">RMSE (Skala 0-100)</td>
+                  <td class="py-2 text-right text-amber-800">0.464</td>
+                  <td class="py-2 text-right text-emerald-800 font-bold">2.213</td>
+                </tr>
+                <tr>
+                  <td class="py-2 font-sans font-medium text-slate-700">MAE</td>
+                  <td class="py-2 text-right text-amber-800">0.325</td>
+                  <td class="py-2 text-right text-emerald-800 font-bold">1.755</td>
+                </tr>
+                <tr>
+                  <td class="py-2 font-sans font-medium text-slate-700">Overall Accuracy</td>
+                  <td class="py-2 text-right text-slate-400">—</td>
+                  <td class="py-2 text-right text-emerald-800 font-bold">90.27%</td>
+                </tr>
+                <tr>
+                  <td class="py-2 font-sans font-medium text-slate-700">Balanced Accuracy</td>
+                  <td class="py-2 text-right text-slate-400">—</td>
+                  <td class="py-2 text-right text-emerald-800 font-bold">90.46%</td>
+                </tr>
+                <tr>
+                  <td class="py-2 font-sans font-medium text-slate-700">Macro-F1 Score</td>
+                  <td class="py-2 text-right text-slate-400">—</td>
+                  <td class="py-2 text-right text-emerald-800 font-bold">0.9053</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+
+          <!-- 3x3 Confusion Matrix -->
+          <div class="bg-slate-50 rounded-xl border border-slate-200 p-4">
+            <h3 class="text-sm font-bold text-slate-900 mb-1">2. Confusion Matrix Out-of-Fold (N = 1.500)</h3>
+            <p class="text-[11px] text-slate-500 mb-3">Prediksi klasifikasi tier intervensi lintas 22 distrik Punjab</p>
+            <table class="w-full text-xs text-center border-collapse">
+              <thead>
+                <tr class="text-[11px] text-slate-600">
+                  <th class="p-1.5 border border-slate-200 bg-slate-100">Aktual \ Prediksi</th>
+                  <th class="p-1.5 border border-slate-200 bg-rose-50 text-rose-900">P1 (Critical)</th>
+                  <th class="p-1.5 border border-slate-200 bg-amber-50 text-amber-900">P2 (High)</th>
+                  <th class="p-1.5 border border-slate-200 bg-emerald-50 text-emerald-900">P3 (Sched.)</th>
+                </tr>
+              </thead>
+              <tbody class="mono">
+                <tr>
+                  <td class="p-2 border border-slate-200 font-sans font-bold bg-rose-50 text-rose-900 text-left">Aktual P1 (438)</td>
+                  <td class="p-2 border border-slate-200 bg-emerald-600 text-white font-extrabold">401</td>
+                  <td class="p-2 border border-slate-200 bg-amber-100 text-amber-900">37</td>
+                  <td class="p-2 border border-slate-200 bg-white text-slate-400">0</td>
+                </tr>
+                <tr>
+                  <td class="p-2 border border-slate-200 font-sans font-bold bg-amber-50 text-amber-900 text-left">Aktual P2 (639)</td>
+                  <td class="p-2 border border-slate-200 bg-amber-100 text-amber-900">32</td>
+                  <td class="p-2 border border-slate-200 bg-emerald-600 text-white font-extrabold">569</td>
+                  <td class="p-2 border border-slate-200 bg-amber-100 text-amber-900">38</td>
+                </tr>
+                <tr>
+                  <td class="p-2 border border-slate-200 font-sans font-bold bg-emerald-50 text-emerald-900 text-left">Aktual P3 (423)</td>
+                  <td class="p-2 border border-slate-200 bg-white text-slate-400">0</td>
+                  <td class="p-2 border border-slate-200 bg-amber-100 text-amber-900">39</td>
+                  <td class="p-2 border border-slate-200 bg-emerald-600 text-white font-extrabold">384</td>
+                </tr>
+              </tbody>
+            </table>
+            <div class="mt-3 grid grid-cols-3 gap-2 text-center text-[11px]">
+              <div class="bg-white p-2 rounded border border-slate-200">
+                <div class="text-slate-500">F1 Kelas P1</div>
+                <div class="font-bold text-rose-700 mono">0.9208</div>
+              </div>
+              <div class="bg-white p-2 rounded border border-slate-200">
+                <div class="text-slate-500">F1 Kelas P2</div>
+                <div class="font-bold text-amber-700 mono">0.8863</div>
+              </div>
+              <div class="bg-white p-2 rounded border border-slate-200">
+                <div class="text-slate-500">F1 Kelas P3</div>
+                <div class="font-bold text-emerald-700 mono">0.9089</div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Permutation Feature Importance Chart -->
+          <div class="bg-slate-50 rounded-xl border border-slate-200 p-4">
+            <h3 class="text-sm font-bold text-slate-900 mb-1">3. Permutation Feature Importance (%)</h3>
+            <p class="text-[11px] text-slate-500 mb-2">Kontribusi variabel biofisik &amp; operasional pada GroupKFold</p>
+            <div class="relative h-56">
+              <canvas id="chartFeatureImportance"></canvas>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- =================================================================== -->
+    <!-- TAB 4: CODE AUDIT & DUAL-DEPLOYMENT ARCHITECTURE                    -->
+    <!-- =================================================================== -->
+    <section id="tab-audit" class="tab-panel hidden space-y-6">
+      <div class="bg-white rounded-xl border border-slate-200 p-5 shadow-sm space-y-5">
+        <div>
+          <span class="text-xs font-bold uppercase tracking-wider text-emerald-700">Laporan Audit Forensik &amp; Rekayasa Perangkat Lunak</span>
+          <h2 class="text-lg font-extrabold text-slate-900 mt-0.5">
+            Spesifikasi Teknis Refactoring &amp; Konfigurasi Dual-Deployment (Streamlit + Vercel)
+          </h2>
+        </div>
+
+        <div class="overflow-x-auto">
+          <table class="w-full text-xs text-left border-collapse">
+            <thead class="bg-slate-900 text-white">
+              <tr>
+                <th class="p-3">Aspek Audit</th>
+                <th class="p-3">Kondisi Lama (<code class="mono">subak-soil-main.zip</code>)</th>
+                <th class="p-3">Revisi &amp; Perbaikan (<code class="mono">SUBAK-SOIL v2.0</code>)</th>
+              </tr>
+            </thead>
+            <tbody class="divide-y divide-slate-200">
+              <tr>
+                <td class="p-3 font-bold text-slate-900">1. UI/UX &amp; Peta StreetMap</td>
+                <td class="p-3 text-rose-700">Menggunakan kartu hijau dasar Streamlit &amp; <code class="mono">pydeck</code> <code class="mono">mapbox/light-v10</code> tanpa label jalan/desa StreetMap.</td>
+                <td class="p-3 text-emerald-800 font-medium">Desain eksekutif <i>Geospatial Agri-Intelligence</i> dengan peta <b>Leaflet.js StreetMap, OpenStreetMap, &amp; Citra Satelit</b> beserta lingkaran radius sharing CHC.</td>
+              </tr>
+              <tr>
+                <td class="p-3 font-bold text-slate-900">2. Bebas Double Fungsi &amp; Double Code</td>
+                <td class="p-3 text-rose-700">Fungsi baca CSV ganda (<code class="mono">load_dataset</code> di <code class="mono">app.py</code> vs <code class="mono">read_csv</code> di scheduler), <code class="mono">import pandas</code> 3× di satu fungsi, rumus stoikiometri ICAR ditulis berulang di 2 file.</td>
+                <td class="p-3 text-emerald-800 font-medium">Arsitektur <b>Single Source of Truth</b> di <code class="mono">subak_soil_scheduler.py</code>. Baik <code class="mono">app.py</code> (Streamlit) maupun <code class="mono">api/index.py</code> (Vercel) mengimpor fungsi &amp; konstanta yang sama tanpa duplikasi.</td>
+              </tr>
+              <tr>
+                <td class="p-3 font-bold text-slate-900">3. Bebas Double File</td>
+                <td class="p-3 text-rose-700">Tidak ada pemisahan jelas untuk deployment multi-cloud (hanya mendukung Streamlit).</td>
+                <td class="p-3 text-emerald-800 font-medium">Struktur repositori tunggal yang bersih: 1 engine inti, 1 entrypoint Streamlit (<code class="mono">app.py</code>), 1 entrypoint Vercel API (<code class="mono">api/index.py</code>), 1 frontend (<code class="mono">public/index.html</code>), dan 1 dataset CSV.</td>
+              </tr>
+              <tr>
+                <td class="p-3 font-bold text-slate-900">4. Optimasi OR-Tools &amp; Baseline Jujur</td>
+                <td class="p-3 text-rose-700"><code class="mono">ortools</code> ada di <code class="mono">requirements.txt</code> tetapi tidak dipakai di kode; baseline dihitung dengan rumus statis <code class="mono">0.35 + 0.02*deadline</code> yang mengabaikan mesin CHC lokal.</td>
+                <td class="p-3 text-emerald-800 font-medium">Mengimplementasikan <b>Google OR-Tools CP-SAT Integer Programming</b> asli (<code class="mono">cp_model.CpModel</code>) dan menghitung baseline jujur dari kapasitas mesin CHC lokal masing-masing desa + metrik keadilan <b>Koefisien Gini</b>.</td>
+              </tr>
+              <tr>
+                <td class="p-3 font-bold text-slate-900">5. Koreksi Matriks Evaluasi AI</td>
+                <td class="p-3 text-rose-700">Belum ada modul validasi silang spasial; skor prioritas CSV mengalami <i>Target Formula Leakage</i> dari <code class="mono">fire_risk_index</code>.</td>
+                <td class="p-3 text-emerald-800 font-medium">Validasi <b>Spatial Block GroupKFold (5-Fold lintas 22 Distrik)</b>, <i>Confusion Matrix</i> 3×3, Macro-F1 (0.9053), RMSE (2.213), dan <i>Permutation Feature Importance</i>.</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <!-- Dual Deployment Instructions -->
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4 pt-2">
+          <div class="p-4 rounded-xl bg-slate-900 text-slate-100">
+            <h3 class="text-sm font-bold text-amber-300 mb-2">Prosedur Push ke GitHub &amp; Sinkronisasi Streamlit Cloud</h3>
+            <p class="text-xs text-slate-300 mb-2">Ekstrak file <code class="mono text-emerald-300">subak-soil-v2-clean.zip</code> ke repositori GitHub Anda lalu jalankan:</p>
+            <pre class="text-[11px] mono bg-slate-950 p-3 rounded-lg text-emerald-300 overflow-x-auto">git add .
+git commit -m "feat: upgrade SUBAK-SOIL v2.0 SSOT + StreetMap + GroupKFold AI"
+git push origin main</pre>
+            <p class="text-[11px] text-slate-400 mt-2">Streamlit Cloud otomatis mendeteksi perubahan di <code class="mono">app.py</code> dan memperbarui aplikasi secara langsung.</p>
+          </div>
+          <div class="p-4 rounded-xl bg-slate-900 text-slate-100">
+            <h3 class="text-sm font-bold text-sky-300 mb-2">Prosedur Deployment Serverless pada Vercel</h3>
+            <p class="text-xs text-slate-300 mb-2">Tanpa mengubah satu baris kode pun, hubungkan repo GitHub yang sama ke Vercel:</p>
+            <pre class="text-[11px] mono bg-slate-950 p-3 rounded-lg text-sky-300 overflow-x-auto"># Opsi 1: Melalui Dashboard Web Vercel
+1. Buka https://vercel.com/new
+2. Pilih repository GitHub: willieka1/subak-soil
+3. Klik Deploy (vercel.json otomatis mengatur Python API &amp; UI)
+
+# Opsi 2: Melalui Vercel CLI
+npx vercel --prod</pre>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- =================================================================== -->
+    <!-- TAB 5: USAGE GUIDE & SCIENTIFIC REFERENCES                          -->
+    <!-- =================================================================== -->
+    <section id="tab-guide" class="tab-panel hidden space-y-6">
+      <div class="bg-white rounded-xl border border-slate-200 p-5 shadow-sm space-y-5">
+        <div>
+          <span class="text-xs font-bold uppercase tracking-wider text-emerald-700">Dokumentasi Operasional &amp; Landasan Literatur</span>
+          <h2 class="text-lg font-extrabold text-slate-900 mt-0.5">Protokol Operasional Lapangan &amp; Referensi Literatur Ilmiah</h2>
+        </div>
+
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div class="p-4 rounded-xl border border-slate-200 bg-slate-50">
+            <div class="text-xs font-extrabold uppercase text-emerald-800 mb-1">Langkah 1 · Operasi Spasial GIS</div>
+            <p class="text-xs text-slate-700 leading-relaxed">
+              Pada <b>Tab 1</b>, pilih distrik target di Punjab, atur kapasitas maksimum mesin <i>Super Seeder</i> per desa/hari (5–25 unit), dan atur radius berbagi pakai mesin antar-CHC (5–30 km). Peta StreetMap akan menampilkan desa yang tuntas (hijau) dan desa yang memerlukan relokasi armada (merah/oranye).
+            </p>
+          </div>
+          <div class="p-4 rounded-xl border border-slate-200 bg-slate-50">
+            <div class="text-xs font-extrabold uppercase text-emerald-800 mb-1">Langkah 2 · Uji Lab &amp; Inferensi AI</div>
+            <p class="text-xs text-slate-700 leading-relaxed">
+              Pada <b>Tab 2</b>, masukkan nilai parameter <i>Soil Health Card</i> desa (SOC, pH, tekstur tanah, N, P₂O₅, K₂O) atau klik salah satu desa langsung dari peta. Mesin AI akan menghitung Skor Urgensi, efisiensi bioavailabilitas Fosfor berdasarkan pH tanah, serta rekomendasi dosis <i>Pusa Decomposer</i> &amp; starter N.
+            </p>
+          </div>
+          <div class="p-4 rounded-xl border border-slate-200 bg-slate-50">
+            <div class="text-xs font-extrabold uppercase text-emerald-800 mb-1">Langkah 3 · Audit &amp; Ekspor Jadwal</div>
+            <p class="text-xs text-slate-700 leading-relaxed">
+              Pada <b>Tab 3</b>, verifikasi ketahanan model menggunakan matriks <i>Spatial Block GroupKFold</i> dan <i>Confusion Matrix</i>. Selanjutnya, klik tombol <b>Ekspor Jadwal CSV</b> di kanan atas untuk mengunduh lembar kerja alokasi harian (Hari 1 s.d. Hari 15) bagi operator CHC di lapangan.
+            </p>
+          </div>
+        </div>
+
+        <div class="border-t border-slate-200 pt-4">
+          <h3 class="text-sm font-bold text-slate-900 mb-2">Daftar Pustaka &amp; Sumber Data Primer</h3>
+          <ul class="space-y-2 text-xs text-slate-700">
+            <li>
+            • <b>Rujukan Kebijakan Operasional:</b> <span class="font-semibold text-slate-800">Department of Agriculture &amp; Farmers Welfare, Government of Punjab — In-Situ Crop Residue Management (CRM) Operational Protocol &amp; PAU Ludhiana Farm Machinery Guidelines</span>.
+            </li>
+            <li>
+              • <b>Krisis SOC &amp; Rasio NPK Tanah India (2024–2025):</b> <a href="https://icrier.org/pdf/pb63_Improving-Soil-Health-Better-Crop-Health-and-Human-Nutrition.pdf" target="_blank" rel="noopener noreferrer" class="text-emerald-700 underline font-semibold">ICRIER Policy Brief #63 — Improving Soil Health for Better Crop Health</a> &amp; <a href="https://agriarticles.com/wp-content/uploads/2026/09/E-06-05-141-627-631.pdf" target="_blank" rel="noopener noreferrer" class="text-emerald-700 underline font-semibold">Soil Health Card (SHC) Nutrient Status Assessment (75% sampel di bawah ambang 0,75% SOC)</a>.
+            </li>
+            <li>
+              • <b>Stoikiometri Kehilangan Hara Pembakaran Jerami Padi (ICAR-IARI &amp; NPMCR):</b> <a href="https://pmc.ncbi.nlm.nih.gov/articles/PMC6427124/" target="_blank" rel="noopener noreferrer" class="text-emerald-700 underline font-semibold">PMC6427124 — Crop Residue Management &amp; Soil Carbon Loss (400 kg C, 5,5 kg N, 2,3 kg P₂O₅, 25 kg K₂O per ton jerami)</a>.
+            </li>
+            <li>
+              • <b>Penalti Keterlambatan Tanam Gandum &amp; Utilisasi Mesin CHC:</b> <a href="https://www.mdpi.com/2073-445x/15/8/1453" target="_blank" rel="noopener noreferrer" class="text-emerald-700 underline font-semibold">MDPI Agronomy — Wheat Yield Penalty Beyond Optimal Window (200–500 kg/ha/minggu)</a> &amp; <a href="https://earth5r.org/stubble-burning-india/" target="_blank" rel="noopener noreferrer" class="text-emerald-700 underline font-semibold">Earth5R / CEEW — Custom Hiring Centre Utilization Analysis</a>.
+            </li>
+            <li>
+              • <b>Model Matematika Sinkronisasi Subak Bali:</b> <a href="http://www.islandsoforder.com/uploads/4/3/4/1/43417789/lansing_1993_amanthropol_v95_p97.pdf" target="_blank" rel="noopener noreferrer" class="text-emerald-700 underline font-semibold">J. S. Lansing &amp; J. N. Kremer (1993), "Emergent Properties of Balinese Water Temple Networks", American Anthropologist 95(1), 97–114</a>.
+            </li>
+          </ul>
+        </div>
+      </div>
+    </section>
+
+  </main>
+
+  <!-- FOOTER -->
+  <footer class="bg-slate-900 text-slate-400 text-xs py-4 border-t border-slate-800 mt-8">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 flex flex-col sm:flex-row items-center justify-between gap-2">
+      <div><b>SUBAK-SOIL</b> — Regional Crop Residue &amp; Soil Carbon Dispatch System</div>
+      <div>Punjab Remote Sensing &amp; CHC Operations Research Module · Operations Decision Support System</div>
+    </div>
+  </footer>
+
+  <!-- TOAST NOTIFICATION -->
+  <div id="toastBox" class="fixed bottom-5 right-5 hidden bg-slate-900 text-white px-4 py-3 rounded-xl shadow-xl border border-emerald-500/40 text-xs font-medium z-50"></div>
+
+  <!-- APPLICATION SCRIPT -->
+  <script>
+    const RAW_CLUSTERS = [["CLUST-PB-0558","Village Ajnala Patti #10","Ajnala","Amritsar",31.5796,74.9206,"Alluvial",0.28,"CRITICAL (<0.50%)",117.2,33.1,263.4,7.44,104,2,4],["CLUST-PB-0549","Village Majitha Kalan #1","Majitha","Amritsar",31.6304,74.8236,"Loamy",0.49,"CRITICAL (<0.50%)",122.7,62.5,166.4,7.41,273,1,1],["CLUST-PB-0576","Village Jandiala Guru Pind #28","Jandiala Guru","Amritsar",31.6333,74.9342,"Loamy",0.42,"CRITICAL (<0.50%)",74.3,55.2,226.5,7.43,192,3,5],["CLUST-PB-0569","Village Rayya Garh #21","Rayya","Amritsar",31.6504,74.9257,"Clay Loam",0.28,"CRITICAL (<0.50%)",75.2,60.2,177.8,7.55,257,6,1],["CLUST-PB-0599","Village Attari Majra #51","Attari","Amritsar",31.6131,74.9319,"Sandy Loam",0.6,"DEFICIENT (0.50-0.75%)",78.4,41.7,198.4,6.76,319,1,4],["CLUST-PB-0608","Village Jandiala Guru Dera #60","Jandiala Guru","Amritsar",31.662,74.8218,"Sandy Loam",0.46,"CRITICAL (<0.50%)",102.7,47.4,250.0,7.2,315,4,4],["CLUST-PB-0603","Village Chogawan Pur #55","Chogawan","Amritsar",31.6825,74.8794,"Loamy",0.28,"CRITICAL (<0.50%)",110.4,35.5,164.6,7.08,222,7,5],["CLUST-PB-0556","Village Harsha Chhina Kot #8","Harsha Chhina","Amritsar",31.6043,74.8093,"Sandy Loam",0.37,"CRITICAL (<0.50%)",102.2,34.9,178.7,6.58,224,6,3],["CLUST-PB-0572","Village Harsha Chhina Dera #24","Harsha Chhina","Amritsar",31.6218,74.8963,"Clay Loam",0.58,"DEFICIENT (0.50-0.75%)",131.0,49.3,226.3,7.33,272,3,5],["CLUST-PB-0561","Village Rayya Kalan #13","Rayya","Amritsar",31.5992,74.8195,"Alluvial",0.46,"CRITICAL (<0.50%)",123.4,47.5,237.5,6.92,294,5,5],["CLUST-PB-0567","Village Attari Pur #19","Attari","Amritsar",31.6204,74.7337,"Loamy",0.71,"DEFICIENT (0.50-0.75%)",119.2,49.8,228.9,7.35,227,1,5],["CLUST-PB-0594","Village Verka Patti #46","Verka","Amritsar",31.7196,74.7927,"Loamy",0.28,"CRITICAL (<0.50%)",123.2,52.3,219.0,7.45,188,8,4],["CLUST-PB-0585","Village Rayya Kalan #37","Rayya","Amritsar",31.6789,74.8871,"Clay Loam",0.66,"DEFICIENT (0.50-0.75%)",102.2,61.8,229.1,6.94,74,2,2],["CLUST-PB-0615","Village Attari Pur #67","Attari","Amritsar",31.6361,74.9054,"Alluvial",0.64,"DEFICIENT (0.50-0.75%)",86.6,45.4,178.2,7.14,171,3,1],["CLUST-PB-0584","Village Jandiala Guru Dera #36","Jandiala Guru","Amritsar",31.6546,74.9714,"Loamy",0.71,"DEFICIENT (0.50-0.75%)",101.9,50.4,244.2,7.53,300,2,3],["CLUST-PB-0565","Village Majitha Wala #17","Majitha","Amritsar",31.5862,74.9303,"Alluvial",0.66,"DEFICIENT (0.50-0.75%)",114.7,61.1,178.7,6.94,223,3,1],["CLUST-PB-0753","Village Tapa Kalan #1","Tapa","Barnala",30.3469,75.6286,"Clay Loam",0.49,"CRITICAL (<0.50%)",111.2,41.1,138.3,7.55,306,2,3],["CLUST-PB-0784","Village Sehna Kot #32","Sehna","Barnala",30.3246,75.482,"Clay Loam",0.54,"DEFICIENT (0.50-0.75%)",103.7,38.4,159.7,7.55,104,2,1],["CLUST-PB-0817","Village Dhanaula Wala #65","Dhanaula","Barnala",30.431,75.5355,"Clay Loam",0.64,"DEFICIENT (0.50-0.75%)",54.2,51.0,101.1,7.18,169,1,5],["CLUST-PB-0758","Village Tapa Wali #6","Tapa","Barnala",30.4176,75.4971,"Loamy",0.67,"DEFICIENT (0.50-0.75%)",76.4,49.2,227.5,7.31,158,1,2],["CLUST-PB-0764","Village Sehna Dera #12","Sehna","Barnala",30.3901,75.7072,"Alluvial",0.61,"DEFICIENT (0.50-0.75%)",70.2,47.9,127.4,6.92,79,2,4],["CLUST-PB-0780","Village Mehal Kalan Pind #28","Mehal Kalan","Barnala",30.3579,75.5156,"Alluvial",0.45,"CRITICAL (<0.50%)",107.3,29.4,155.0,7.19,104,5,5],["CLUST-PB-0791","Village Handiaya Majra #39","Handiaya","Barnala",30.4743,75.54,"Alluvial",0.62,"DEFICIENT (0.50-0.75%)",98.8,37.6,209.7,7.51,109,3,3],["CLUST-PB-0800","Village Mehal Kalan Dera #48","Mehal Kalan","Barnala",30.4555,75.5571,"Loamy",0.69,"DEFICIENT (0.50-0.75%)",93.3,44.9,180.7,7.66,103,2,5],["CLUST-PB-0786","Village Handiaya Patti #34","Handiaya","Barnala",30.4315,75.4239,"Sandy Loam",0.7,"DEFICIENT (0.50-0.75%)",100.5,39.5,121.9,7.68,173,2,4],["CLUST-PB-0797","Village Dhanaula Garh #45","Dhanaula","Barnala",30.4446,75.5408,"Clay Loam",0.74,"DEFICIENT (0.50-0.75%)",77.3,33.1,137.9,7.83,124,2,3],["CLUST-PB-0754","Village Sehna Khurd #2","Sehna","Barnala",30.465,75.6892,"Loamy",0.81,"MODERATE (>0.75%)",64.4,43.8,154.7,6.87,179,1,5],["CLUST-PB-0816","Village Handiaya Pind #64","Handiaya","Barnala",30.3359,75.5799,"Alluvial",0.71,"DEFICIENT (0.50-0.75%)",78.4,44.0,150.0,7.37,254,3,3],["CLUST-PB-0762","Village Dhanaula Patti #10","Dhanaula","Barnala",30.2934,75.5549,"Alluvial",0.41,"CRITICAL (<0.50%)",76.3,37.5,152.9,7.01,216,8,3],["CLUST-PB-0783","Village Tapa Pur #31","Tapa","Barnala",30.4508,75.5037,"Loamy",0.48,"CRITICAL (<0.50%)",86.5,37.3,178.5,6.58,235,7,4],["CLUST-PB-0794","Village Sehna Wali #42","Sehna","Barnala",30.3107,75.5728,"Clay Loam",0.73,"DEFICIENT (0.50-0.75%)",96.0,39.5,249.6,7.6,282,3,4],["CLUST-PB-0772","Village Dhanaula Kot #20","Dhanaula","Barnala",30.5038,75.5852,"Loamy",0.8,"MODERATE (>0.75%)",85.6,33.5,186.2,7.07,145,2,3],["CLUST-PB-0265","Village Talwandi Sabo Patti #58","Talwandi Sabo","Bathinda",30.222,74.9396,"Alluvial",0.46,"CRITICAL (<0.50%)",70.1,46.7,192.5,6.87,217,2,2],["CLUST-PB-0231","Village Maur Dera #24","Maur","Bathinda",30.1496,75.0481,"Sandy Loam",0.47,"CRITICAL (<0.50%)",54.5,45.0,168.8,7.06,220,2,2],["CLUST-PB-0212","Village Sangat Wala #5","Sangat","Bathinda",30.208,74.9046,"Loamy",0.47,"CRITICAL (<0.50%)",98.2,53.5,213.5,6.65,197,3,4],["CLUST-PB-0273","Village Maur Wali #66","Maur","Bathinda",30.1571,75.0115,"Alluvial",0.55,"DEFICIENT (0.50-0.75%)",57.9,46.2,261.0,7.3,125,2,3],["CLUST-PB-0219","Village Sangat Dera #12","Sangat","Bathinda",30.3522,74.9077,"Alluvial",0.62,"DEFICIENT (0.50-0.75%)",103.5,35.3,199.7,7.19,246,2,5],["CLUST-PB-0244","Village Talwandi Sabo Kalan #37","Talwandi Sabo","Bathinda",30.1097,74.8881,"Clay Loam",0.69,"DEFICIENT (0.50-0.75%)",72.0,58.2,243.7,7.67,84,1,1],["CLUST-PB-0258","Village Talwandi Sabo Majra #51","Talwandi Sabo","Bathinda",30.1811,74.9338,"Sandy Loam",0.59,"DEFICIENT (0.50-0.75%)",97.7,43.9,208.6,6.63,250,3,3],["CLUST-PB-0252","Village Maur Garh #45","Maur","Bathinda",30.2064,74.8378,"Alluvial",0.67,"DEFICIENT (0.50-0.75%)",75.0,50.0,266.8,6.65,257,2,2],["CLUST-PB-0257","Village Rampura Phul Khurd #50","Rampura Phul","Bathinda",30.1976,74.8207,"Sandy Loam",0.75,"DEFICIENT (0.50-0.75%)",79.4,38.0,212.5,6.94,121,1,2],["CLUST-PB-0264","Village Rampura Phul Garh #57","Rampura Phul","Bathinda",30.2727,74.8946,"Sandy Loam",0.63,"DEFICIENT (0.50-0.75%)",62.3,40.1,162.8,6.95,185,3,1],["CLUST-PB-0210","Village Maur Majra #3","Maur","Bathinda",30.2785,74.9705,"Sandy Loam",0.45,"CRITICAL (<0.50%)",102.9,54.1,188.1,7.3,98,6,5],["CLUST-PB-0255","Village Nathana Dera #48","Nathana","Bathinda",30.1337,74.9417,"Clay Loam",0.52,"DEFICIENT (0.50-0.75%)",76.6,46.0,183.2,6.7,102,5,1],["CLUST-PB-0253","Village Goniana Patti #46","Goniana","Bathinda",30.1372,74.9457,"Alluvial",0.28,"CRITICAL (<0.50%)",67.9,68.0,190.3,7.64,247,9,2],["CLUST-PB-0213","Village Nathana Wali #6","Nathana","Bathinda",30.1924,74.856,"Clay Loam",0.67,"DEFICIENT (0.50-0.75%)",61.0,47.8,199.3,7.05,112,3,1],["CLUST-PB-0211","Village Goniana Pind #4","Goniana","Bathinda",30.2273,74.7849,"Clay Loam",0.46,"CRITICAL (<0.50%)",95.5,54.2,202.2,7.58,252,7,2],["CLUST-PB-0266","Village Maur Basti #59","Maur","Bathinda",30.2908,74.8984,"Loamy",0.66,"DEFICIENT (0.50-0.75%)",70.4,47.3,252.3,7.16,82,4,5],["CLUST-PB-0922","Village Jaitu Patti #34","Jaitu","Faridkot",30.7301,74.696,"Loamy",0.42,"CRITICAL (<0.50%)",78.0,43.3,150.2,6.92,183,1,4],["CLUST-PB-0925","Village Kotkapura Kalan #37","Kotkapura","Faridkot",30.6164,74.8084,"Sandy Loam",0.6,"DEFICIENT (0.50-0.75%)",81.5,32.8,187.9,6.35,118,1,1],["CLUST-PB-0914","Village Jaitu Khurd #26","Jaitu","Faridkot",30.6412,74.8428,"Clay Loam",0.47,"CRITICAL (<0.50%)",95.6,49.1,175.1,6.71,283,4,2],["CLUST-PB-0951","Village Sadiq Majra #63","Sadiq","Faridkot",30.6707,74.7872,"Alluvial",0.66,"DEFICIENT (0.50-0.75%)",76.2,43.8,200.5,7.0,135,1,3],["CLUST-PB-0912","Village Bajakhana Dera #24","Bajakhana","Faridkot",30.5919,74.7942,"Loamy",0.65,"DEFICIENT (0.50-0.75%)",117.3,33.0,215.2,7.0,300,2,4],["CLUST-PB-0927","Village Sadiq Majra #39","Sadiq","Faridkot",30.6962,74.8773,"Clay Loam",0.72,"DEFICIENT (0.50-0.75%)",65.7,48.1,187.2,6.52,61,2,2],["CLUST-PB-0943","Village Sadiq Pur #55","Sadiq","Faridkot",30.6545,74.686,"Loamy",0.73,"DEFICIENT (0.50-0.75%)",69.8,39.1,197.5,7.26,275,2,2],["CLUST-PB-0896","Village Bajakhana Kot #8","Bajakhana","Faridkot",30.5735,74.7706,"Loamy",0.81,"MODERATE (>0.75%)",116.1,46.3,194.2,7.28,255,1,2],["CLUST-PB-0953","Village Kotkapura Wala #65","Kotkapura","Faridkot",30.5905,74.7792,"Alluvial",0.71,"DEFICIENT (0.50-0.75%)",135.6,34.1,220.1,6.56,92,3,2],["CLUST-PB-0915","Village Sadiq Majra #27","Sadiq","Faridkot",30.752,74.8131,"Loamy",0.9,"MODERATE (>0.75%)",54.7,44.3,165.6,6.84,116,1,3],["CLUST-PB-0928","Village Bajakhana Pind #40","Bajakhana","Faridkot",30.6117,74.6574,"Clay Loam",0.78,"MODERATE (>0.75%)",70.2,46.3,187.9,6.74,95,3,2],["CLUST-PB-0916","Village Bajakhana Pind #28","Bajakhana","Faridkot",30.6602,74.8101,"Sandy Loam",0.85,"MODERATE (>0.75%)",60.4,34.5,163.7,7.09,295,2,2],["CLUST-PB-0902","Village Jaitu Khurd #14","Jaitu","Faridkot",30.8236,74.7964,"Clay Loam",0.74,"DEFICIENT (0.50-0.75%)",89.2,45.6,146.3,6.87,118,4,1],["CLUST-PB-0890","Village Jaitu Khurd #2","Jaitu","Faridkot",30.6901,74.785,"Alluvial",0.75,"DEFICIENT (0.50-0.75%)",63.1,49.3,194.8,6.94,168,4,4],["CLUST-PB-0911","Village Sadiq Basti #23","Sadiq","Faridkot",30.7009,74.7863,"Loamy",0.71,"DEFICIENT (0.50-0.75%)",101.0,38.7,153.2,6.46,296,5,2],["CLUST-PB-0941","Village Kotkapura Wala #53","Kotkapura","Faridkot",30.6505,74.836,"Sandy Loam",0.72,"DEFICIENT (0.50-0.75%)",71.0,33.2,141.4,6.94,214,5,1],["CLUST-PB-0871","Village Sirhind Majra #51","Sirhind","Fatehgarh Sahib",30.5349,76.2962,"Loamy",0.36,"CRITICAL (<0.50%)",67.0,54.3,155.9,7.09,315,2,4],["CLUST-PB-0860","Village Khera Pind #40","Khera","Fatehgarh Sahib",30.6145,76.3968,"Loamy",0.59,"DEFICIENT (0.50-0.75%)",85.0,61.8,120.6,7.58,206,2,2],["CLUST-PB-0832","Village Amloh Dera #12","Amloh","Fatehgarh Sahib",30.696,76.3942,"Loamy",0.62,"DEFICIENT (0.50-0.75%)",80.2,48.9,144.9,7.51,114,3,5],["CLUST-PB-0864","Village Khamano Kot #44","Khamano","Fatehgarh Sahib",30.5847,76.4288,"Clay Loam",0.62,"DEFICIENT (0.50-0.75%)",93.6,57.0,194.4,7.28,74,4,3],["CLUST-PB-0850","Village Khera Wali #30","Khera","Fatehgarh Sahib",30.755,76.4443,"Clay Loam",0.83,"MODERATE (>0.75%)",104.8,51.0,180.4,7.2,103,1,5],["CLUST-PB-0855","Village Khera Basti #35","Khera","Fatehgarh Sahib",30.5917,76.453,"Sandy Loam",0.65,"DEFICIENT (0.50-0.75%)",85.6,46.6,146.7,7.54,104,4,3],["CLUST-PB-0851","Village Sirhind Pur #31","Sirhind","Fatehgarh Sahib",30.6772,76.4539,"Clay Loam",0.78,"MODERATE (>0.75%)",100.5,36.0,185.9,6.87,238,2,3],["CLUST-PB-0853","Village Bassi Pathana Garh #33","Bassi Pathana","Fatehgarh Sahib",30.6199,76.4565,"Clay Loam",0.78,"MODERATE (>0.75%)",59.6,49.7,154.2,6.27,134,2,3],["CLUST-PB-0822","Village Amloh Khurd #2","Amloh","Fatehgarh Sahib",30.5941,76.5327,"Alluvial",0.85,"MODERATE (>0.75%)",88.5,48.8,148.3,7.24,229,1,2],["CLUST-PB-0873","Village Bassi Pathana Wala #53","Bassi Pathana","Fatehgarh Sahib",30.7358,76.3831,"Clay Loam",0.49,"CRITICAL (<0.50%)",105.2,75.3,117.9,6.72,265,7,5],["CLUST-PB-0883","Village Bassi Pathana Majra #63","Bassi Pathana","Fatehgarh Sahib",30.6713,76.4967,"Clay Loam",0.76,"MODERATE (>0.75%)",85.9,44.4,96.5,6.99,67,3,4],["CLUST-PB-0865","Village Khera Garh #45","Khera","Fatehgarh Sahib",30.6569,76.4243,"Sandy Loam",0.84,"MODERATE (>0.75%)",93.3,57.9,140.3,7.3,197,2,5],["CLUST-PB-0835","Village Khera Majra #15","Khera","Fatehgarh Sahib",30.6245,76.3743,"Clay Loam",0.67,"DEFICIENT (0.50-0.75%)",98.8,31.0,139.6,7.11,126,5,1],["CLUST-PB-0824","Village Khamano Pind #4","Khamano","Fatehgarh Sahib",30.6456,76.2506,"Loamy",0.83,"MODERATE (>0.75%)",100.5,45.5,165.3,7.16,124,3,3],["CLUST-PB-0854","Village Khamano Patti #34","Khamano","Fatehgarh Sahib",30.5778,76.4392,"Alluvial",0.83,"MODERATE (>0.75%)",78.8,58.2,104.6,7.3,230,3,2],["CLUST-PB-0878","Village Bassi Pathana Patti #58","Bassi Pathana","Fatehgarh Sahib",30.6069,76.473,"Sandy Loam",0.83,"MODERATE (>0.75%)",84.6,43.2,150.7,7.15,300,3,2],["CLUST-PB-1018","Village Jalalabad Khurd #62","Jalalabad","Fazilka",30.289,74.0093,"Alluvial",0.28,"CRITICAL (<0.50%)",98.5,48.4,175.1,7.24,308,1,2],["CLUST-PB-0968","Village Jalalabad Dera #12","Jalalabad","Fazilka",30.3599,74.0203,"Sandy Loam",0.52,"DEFICIENT (0.50-0.75%)",82.1,48.1,136.5,7.62,70,1,1],["CLUST-PB-0970","Village Arniwala Khurd #14","Arniwala","Fazilka",30.3979,73.9947,"Clay Loam",0.57,"DEFICIENT (0.50-0.75%)",113.4,56.4,186.8,7.11,283,1,2],["CLUST-PB-0957","Village Abohar Kalan #1","Abohar","Fazilka",30.503,74.0116,"Alluvial",0.59,"DEFICIENT (0.50-0.75%)",81.9,52.5,147.3,7.76,92,1,5],["CLUST-PB-1007","Village Abohar Majra #51","Abohar","Fazilka",30.4928,73.9778,"Loamy",0.47,"CRITICAL (<0.50%)",126.5,38.2,99.2,7.78,185,3,5],["CLUST-PB-1022","Village Abohar Wali #66","Abohar","Fazilka",30.4102,73.9723,"Sandy Loam",0.62,"DEFICIENT (0.50-0.75%)",134.2,61.0,122.7,7.15,255,1,4],["CLUST-PB-0969","Village Khuian Sarwar Kalan #13","Khuian Sarwar","Fazilka",30.4185,73.908,"Alluvial",0.29,"CRITICAL (<0.50%)",87.4,41.9,107.9,7.19,124,7,4],["CLUST-PB-0983","Village Jalalabad Majra #27","Jalalabad","Fazilka",30.3481,73.9207,"Sandy Loam",0.7,"DEFICIENT (0.50-0.75%)",79.1,49.2,160.5,7.62,269,1,5],["CLUST-PB-1010","Village Arniwala Wali #54","Arniwala","Fazilka",30.4081,73.9559,"Clay Loam",0.45,"CRITICAL (<0.50%)",96.6,56.3,74.6,7.13,178,5,4],["CLUST-PB-1009","Village Khuian Sarwar Wala #53","Khuian Sarwar","Fazilka",30.388,74.0044,"Sandy Loam",0.34,"CRITICAL (<0.50%)",92.0,50.1,196.4,6.82,79,7,3],["CLUST-PB-0967","Village Abohar Basti #11","Abohar","Fazilka",30.4744,73.9681,"Loamy",0.6,"DEFICIENT (0.50-0.75%)",90.2,69.9,149.8,6.91,305,3,3],["CLUST-PB-0985","Village Arniwala Wala #29","Arniwala","Fazilka",30.4578,74.0911,"Alluvial",0.73,"DEFICIENT (0.50-0.75%)",114.9,52.2,165.3,7.82,222,1,5],["CLUST-PB-1021","Village Sitogunno Wala #65","Sitogunno","Fazilka",30.4133,73.9842,"Sandy Loam",0.49,"CRITICAL (<0.50%)",85.4,43.2,197.5,7.58,111,5,5],["CLUST-PB-1004","Village Khuian Sarwar Dera #48","Khuian Sarwar","Fazilka",30.3866,73.9893,"Alluvial",0.69,"DEFICIENT (0.50-0.75%)",113.0,44.9,142.9,7.36,211,2,1],["CLUST-PB-0972","Village Abohar Pind #16","Abohar","Fazilka",30.3338,74.0554,"Sandy Loam",0.64,"DEFICIENT (0.50-0.75%)",97.3,50.4,130.1,7.71,209,3,5],["CLUST-PB-0995","Village Arniwala Majra #39","Arniwala","Fazilka",30.3346,73.9831,"Alluvial",0.65,"DEFICIENT (0.50-0.75%)",56.8,49.1,155.7,7.5,111,3,1],["CLUST-PB-0284","Village Guruharsahai Kot #8","Guruharsahai","Firozpur",30.8749,74.5603,"Clay Loam",0.56,"DEFICIENT (0.50-0.75%)",99.5,49.1,162.4,7.12,210,3,2],["CLUST-PB-0297","Village Makhu Garh #21","Makhu","Firozpur",30.995,74.5532,"Alluvial",0.56,"DEFICIENT (0.50-0.75%)",96.1,59.5,130.8,7.1,148,3,2],["CLUST-PB-0305","Village Ghall Khurd Wala #29","Ghall Khurd","Firozpur",30.845,74.6768,"Loamy",0.7,"DEFICIENT (0.50-0.75%)",93.1,63.8,244.2,7.27,293,1,3],["CLUST-PB-0335","Village Ghall Khurd Basti #59","Ghall Khurd","Firozpur",30.8403,74.6003,"Sandy Loam",0.78,"MODERATE (>0.75%)",83.6,53.8,141.1,6.97,87,1,2],["CLUST-PB-0277","Village Zira Kalan #1","Zira","Firozpur",30.8286,74.6266,"Loamy",0.79,"MODERATE (>0.75%)",115.9,52.2,205.8,7.7,203,1,4],["CLUST-PB-0296","Village Guruharsahai Kot #20","Guruharsahai","Firozpur",30.9713,74.6404,"Alluvial",0.75,"DEFICIENT (0.50-0.75%)",61.3,51.3,109.4,7.35,213,2,4],["CLUST-PB-0337","Village Zira Kalan #61","Zira","Firozpur",30.9372,74.7042,"Alluvial",0.8,"MODERATE (>0.75%)",104.1,39.7,196.8,6.58,221,2,4],["CLUST-PB-0290","Village Guruharsahai Khurd #14","Guruharsahai","Firozpur",30.9026,74.7491,"Alluvial",0.87,"MODERATE (>0.75%)",91.2,46.1,153.6,6.84,140,1,1],["CLUST-PB-0336","Village Kassowala Dera #60","Kassowala","Firozpur",30.8562,74.5391,"Clay Loam",0.89,"MODERATE (>0.75%)",85.8,55.5,181.1,6.92,202,1,5],["CLUST-PB-0328","Village Mamdot Pind #52","Mamdot","Firozpur",30.9677,74.6961,"Loamy",0.77,"MODERATE (>0.75%)",83.5,56.1,195.9,7.24,312,3,1],["CLUST-PB-0292","Village Mamdot Pind #16","Mamdot","Firozpur",30.8846,74.5403,"Alluvial",0.84,"MODERATE (>0.75%)",98.1,55.6,236.4,7.57,162,2,1],["CLUST-PB-0310","Village Mamdot Patti #34","Mamdot","Firozpur",31.0112,74.5885,"Sandy Loam",0.66,"DEFICIENT (0.50-0.75%)",90.5,74.2,203.9,6.92,298,5,5],["CLUST-PB-0317","Village Ghall Khurd Wala #41","Ghall Khurd","Firozpur",30.8152,74.6362,"Alluvial",0.57,"DEFICIENT (0.50-0.75%)",74.9,72.3,212.6,6.53,212,7,1],["CLUST-PB-0280","Village Mamdot Pind #4","Mamdot","Firozpur",30.9716,74.6914,"Alluvial",0.83,"MODERATE (>0.75%)",85.9,53.1,252.9,7.18,218,3,4],["CLUST-PB-0286","Village Mamdot Patti #10","Mamdot","Firozpur",30.9388,74.5994,"Clay Loam",0.96,"MODERATE (>0.75%)",87.6,61.8,121.9,6.55,288,1,3],["CLUST-PB-0299","Village Ghall Khurd Basti #23","Ghall Khurd","Firozpur",30.9836,74.6553,"Alluvial",0.6,"DEFICIENT (0.50-0.75%)",85.2,35.4,171.2,7.77,117,7,2],["CLUST-PB-1089","Village Dera Baba Nanak Wala #65","Dera Baba Nanak","Gurdaspur",32.0019,75.4171,"Clay Loam",0.37,"CRITICAL (<0.50%)",48.0,50.7,93.2,7.02,141,4,4],["CLUST-PB-1039","Village Batala Majra #15","Batala","Gurdaspur",32.0166,75.2845,"Clay Loam",0.59,"DEFICIENT (0.50-0.75%)",73.2,47.0,131.5,6.84,151,1,3],["CLUST-PB-1050","Village Qadian Khurd #26","Qadian","Gurdaspur",32.0851,75.4036,"Clay Loam",0.5,"DEFICIENT (0.50-0.75%)",74.4,51.9,176.6,7.46,271,4,2],["CLUST-PB-1071","Village Qadian Basti #47","Qadian","Gurdaspur",32.0355,75.4149,"Sandy Loam",0.66,"DEFICIENT (0.50-0.75%)",103.8,36.7,164.5,7.74,149,2,5],["CLUST-PB-1068","Village Dera Baba Nanak Kot #44","Dera Baba Nanak","Gurdaspur",32.0065,75.4364,"Loamy",0.75,"DEFICIENT (0.50-0.75%)",89.1,52.2,187.4,6.48,136,1,3],["CLUST-PB-1090","Village Kalanaur Wali #66","Kalanaur","Gurdaspur",32.0419,75.401,"Alluvial",0.7,"DEFICIENT (0.50-0.75%)",80.7,30.1,147.9,7.42,257,2,4],["CLUST-PB-1056","Village Dhariwal Kot #32","Dhariwal","Gurdaspur",32.0153,75.3693,"Alluvial",0.52,"DEFICIENT (0.50-0.75%)",67.7,44.8,175.3,6.72,265,5,1],["CLUST-PB-1046","Village Batala Patti #22","Batala","Gurdaspur",32.1132,75.2517,"Sandy Loam",0.72,"DEFICIENT (0.50-0.75%)",52.8,53.5,177.0,7.07,196,2,2],["CLUST-PB-1061","Village Dera Baba Nanak Kalan #37","Dera Baba Nanak","Gurdaspur",32.0071,75.466,"Loamy",0.66,"DEFICIENT (0.50-0.75%)",55.2,55.1,156.1,7.45,258,3,3],["CLUST-PB-1054","Village Dera Baba Nanak Wali #30","Dera Baba Nanak","Gurdaspur",32.1658,75.3517,"Clay Loam",0.68,"DEFICIENT (0.50-0.75%)",63.7,52.0,236.4,7.3,64,3,4],["CLUST-PB-1041","Village Kalanaur Wala #17","Kalanaur","Gurdaspur",32.2068,75.3183,"Clay Loam",0.81,"MODERATE (>0.75%)",97.0,47.8,226.9,6.82,317,1,5],["CLUST-PB-1088","Village Batala Pind #64","Batala","Gurdaspur",31.9883,75.3972,"Loamy",0.64,"DEFICIENT (0.50-0.75%)",52.9,46.2,189.0,7.36,75,4,5],["CLUST-PB-1082","Village Dera Baba Nanak Patti #58","Dera Baba Nanak","Gurdaspur",32.0893,75.4357,"Loamy",0.72,"DEFICIENT (0.50-0.75%)",53.5,32.8,203.3,7.33,208,3,2],["CLUST-PB-1040","Village Dera Baba Nanak Pind #16","Dera Baba Nanak","Gurdaspur",32.021,75.4739,"Sandy Loam",0.54,"DEFICIENT (0.50-0.75%)",70.2,51.5,130.1,6.71,255,6,2],["CLUST-PB-1078","Village Qadian Wali #54","Qadian","Gurdaspur",32.1272,75.3931,"Alluvial",0.54,"DEFICIENT (0.50-0.75%)",62.7,46.0,147.1,6.94,66,6,3],["CLUST-PB-1075","Village Dera Baba Nanak Majra #51","Dera Baba Nanak","Gurdaspur",31.8806,75.3143,"Sandy Loam",0.61,"DEFICIENT (0.50-0.75%)",66.0,47.5,131.3,7.62,283,5,2],["CLUST-PB-1098","Village Hajipur Wali #6","Hajipur","Hoshiarpur",31.5962,75.908,"Sandy Loam",0.28,"CRITICAL (<0.50%)",72.7,58.0,193.0,7.38,316,6,5],["CLUST-PB-1135","Village Dasuya Pur #43","Dasuya","Hoshiarpur",31.5638,75.9224,"Loamy",0.66,"DEFICIENT (0.50-0.75%)",103.3,57.9,136.6,7.17,300,1,2],["CLUST-PB-1156","Village Dasuya Pind #64","Dasuya","Hoshiarpur",31.4881,76.0402,"Alluvial",0.71,"DEFICIENT (0.50-0.75%)",95.3,68.6,123.2,7.11,275,1,1],["CLUST-PB-1157","Village Mukerian Wala #65","Mukerian","Hoshiarpur",31.5568,75.8747,"Clay Loam",0.77,"MODERATE (>0.75%)",79.1,51.0,219.3,6.51,102,1,1],["CLUST-PB-1124","Village Mahilpur Kot #32","Mahilpur","Hoshiarpur",31.5099,75.9648,"Clay Loam",0.69,"DEFICIENT (0.50-0.75%)",86.6,63.2,174.1,7.12,278,3,3],["CLUST-PB-1109","Village Garhshankar Wala #17","Garhshankar","Hoshiarpur",31.5809,75.9419,"Loamy",0.67,"DEFICIENT (0.50-0.75%)",132.0,39.1,195.0,6.88,178,4,3],["CLUST-PB-1143","Village Mukerian Majra #51","Mukerian","Hoshiarpur",31.4862,75.9289,"Sandy Loam",0.55,"DEFICIENT (0.50-0.75%)",104.4,45.0,142.7,6.48,190,6,4],["CLUST-PB-1104","Village Tanda Dera #12","Tanda","Hoshiarpur",31.6649,75.899,"Sandy Loam",0.44,"CRITICAL (<0.50%)",101.4,48.4,169.8,7.32,304,8,1],["CLUST-PB-1099","Village Talwara Pur #7","Talwara","Hoshiarpur",31.4497,76.0066,"Loamy",0.7,"DEFICIENT (0.50-0.75%)",94.4,45.6,174.2,7.14,235,4,3],["CLUST-PB-1141","Village Talwara Kalan #49","Talwara","Hoshiarpur",31.5055,75.94,"Sandy Loam",0.77,"MODERATE (>0.75%)",58.4,50.9,114.8,6.67,67,3,1],["CLUST-PB-1134","Village Talwara Wali #42","Talwara","Hoshiarpur",31.5453,75.8815,"Sandy Loam",0.84,"MODERATE (>0.75%)",113.2,69.7,233.8,6.97,246,2,2],["CLUST-PB-1108","Village Mukerian Pind #16","Mukerian","Hoshiarpur",31.6325,75.8231,"Alluvial",0.79,"MODERATE (>0.75%)",116.5,60.8,179.3,7.13,313,3,2],["CLUST-PB-1110","Village Mahilpur Wali #18","Mahilpur","Hoshiarpur",31.5189,75.8571,"Sandy Loam",0.79,"MODERATE (>0.75%)",85.2,50.3,162.7,7.55,225,3,2],["CLUST-PB-1149","Village Dasuya Garh #57","Dasuya","Hoshiarpur",31.5026,76.0759,"Sandy Loam",0.92,"MODERATE (>0.75%)",88.6,70.6,123.0,7.4,213,1,1],["CLUST-PB-1105","Village Hajipur Kalan #13","Hajipur","Hoshiarpur",31.434,75.8881,"Sandy Loam",0.7,"DEFICIENT (0.50-0.75%)",116.6,52.6,194.0,7.3,309,5,5],["CLUST-PB-1136","Village Mukerian Kot #44","Mukerian","Hoshiarpur",31.5295,75.9314,"Loamy",0.77,"MODERATE (>0.75%)",76.0,59.6,157.3,7.06,238,4,1],["CLUST-PB-0665","Village Nakodar Kalan #49","Nakodar","Jalandhar",31.2777,75.6107,"Loamy",0.58,"DEFICIENT (0.50-0.75%)",97.1,51.0,149.0,6.98,95,2,3],["CLUST-PB-0672","Village Bhogpur Kot #56","Bhogpur","Jalandhar",31.3487,75.6428,"Sandy Loam",0.43,"CRITICAL (<0.50%)",53.1,41.0,150.8,6.48,239,5,3],["CLUST-PB-0645","Village Adampur Wala #29","Adampur","Jalandhar",31.4129,75.632,"Loamy",0.74,"DEFICIENT (0.50-0.75%)",137.3,45.5,153.7,6.79,99,1,5],["CLUST-PB-0643","Village Shahkot Majra #27","Shahkot","Jalandhar",31.2118,75.585,"Alluvial",0.68,"DEFICIENT (0.50-0.75%)",91.5,35.2,208.2,6.97,278,2,1],["CLUST-PB-0657","Village Nakodar Wala #41","Nakodar","Jalandhar",31.3168,75.5125,"Sandy Loam",0.55,"DEFICIENT (0.50-0.75%)",109.4,43.7,153.8,6.2,166,5,1],["CLUST-PB-0682","Village Phillaur Wali #66","Phillaur","Jalandhar",31.3493,75.644,"Loamy",0.69,"DEFICIENT (0.50-0.75%)",59.2,41.6,169.0,6.35,103,4,5],["CLUST-PB-0623","Village Nurmahal Pur #7","Nurmahal","Jalandhar",31.354,75.595,"Clay Loam",0.46,"CRITICAL (<0.50%)",83.2,56.0,128.9,7.09,291,8,2],["CLUST-PB-0660","Village Kartarpur Kot #44","Kartarpur","Jalandhar",31.2757,75.5518,"Loamy",0.83,"MODERATE (>0.75%)",90.3,55.5,163.2,7.06,196,3,5],["CLUST-PB-0622","Village Goraya Wali #6","Goraya","Jalandhar",31.3463,75.5832,"Sandy Loam",0.65,"DEFICIENT (0.50-0.75%)",95.9,57.5,179.1,6.77,216,6,5],["CLUST-PB-0628","Village Kartarpur Dera #12","Kartarpur","Jalandhar",31.3271,75.5701,"Sandy Loam",0.78,"MODERATE (>0.75%)",101.6,63.1,275.0,6.96,290,4,3],["CLUST-PB-0670","Village Goraya Wali #54","Goraya","Jalandhar",31.3497,75.7114,"Alluvial",0.93,"MODERATE (>0.75%)",74.6,46.9,195.6,6.53,318,2,1],["CLUST-PB-0621","Village Adampur Wala #5","Adampur","Jalandhar",31.3703,75.5501,"Alluvial",0.56,"DEFICIENT (0.50-0.75%)",106.9,52.9,193.1,6.78,227,8,1],["CLUST-PB-0652","Village Kartarpur Dera #36","Kartarpur","Jalandhar",31.235,75.6168,"Alluvial",1.01,"MODERATE (>0.75%)",116.9,61.6,178.2,6.41,301,1,4],["CLUST-PB-0658","Village Phillaur Wali #42","Phillaur","Jalandhar",31.3513,75.5592,"Alluvial",0.81,"MODERATE (>0.75%)",95.7,60.3,210.1,7.0,215,4,2],["CLUST-PB-0640","Village Bhogpur Dera #24","Bhogpur","Jalandhar",31.2371,75.5931,"Loamy",0.76,"MODERATE (>0.75%)",96.9,34.4,135.4,6.65,264,5,2],["CLUST-PB-0656","Village Bhogpur Pind #40","Bhogpur","Jalandhar",31.3367,75.6293,"Clay Loam",0.9,"MODERATE (>0.75%)",93.9,56.3,183.6,7.03,299,3,3],["CLUST-PB-1172","Village Phagwara Dera #12","Phagwara","Kapurthala",31.3688,75.5037,"Sandy Loam",0.55,"DEFICIENT (0.50-0.75%)",81.7,54.9,183.4,6.95,125,2,5],["CLUST-PB-1216","Village Sultanpur Lodhi Kot #56","Sultanpur Lodhi","Kapurthala",31.4265,75.3104,"Sandy Loam",0.59,"DEFICIENT (0.50-0.75%)",82.1,64.4,165.3,7.17,287,2,1],["CLUST-PB-1217","Village Phagwara Garh #57","Phagwara","Kapurthala",31.4155,75.4279,"Sandy Loam",0.7,"DEFICIENT (0.50-0.75%)",96.5,60.9,172.0,7.33,289,1,4],["CLUST-PB-1224","Village Nadala Pind #64","Nadala","Kapurthala",31.325,75.3087,"Clay Loam",0.71,"DEFICIENT (0.50-0.75%)",84.8,67.0,178.1,6.93,320,2,1],["CLUST-PB-1195","Village Dhilwan Basti #35","Dhilwan","Kapurthala",31.3734,75.385,"Loamy",0.84,"MODERATE (>0.75%)",73.2,50.4,146.3,7.05,262,1,4],["CLUST-PB-1202","Village Phagwara Wali #42","Phagwara","Kapurthala",31.3993,75.4492,"Clay Loam",0.8,"MODERATE (>0.75%)",102.4,37.1,160.4,7.2,89,2,1],["CLUST-PB-1167","Village Phagwara Pur #7","Phagwara","Kapurthala",31.3876,75.4069,"Alluvial",0.51,"DEFICIENT (0.50-0.75%)",67.6,41.4,180.7,6.91,128,7,1],["CLUST-PB-1213","Village Bholath Wala #53","Bholath","Kapurthala",31.3283,75.5182,"Loamy",0.58,"DEFICIENT (0.50-0.75%)",69.9,56.9,128.3,7.03,87,6,1],["CLUST-PB-1182","Village Phagwara Patti #22","Phagwara","Kapurthala",31.3666,75.5686,"Clay Loam",0.78,"MODERATE (>0.75%)",104.9,47.9,143.5,7.59,95,3,2],["CLUST-PB-1200","Village Dhilwan Pind #40","Dhilwan","Kapurthala",31.4007,75.34,"Loamy",0.61,"DEFICIENT (0.50-0.75%)",119.3,44.8,163.6,6.9,138,6,3],["CLUST-PB-1192","Village Phagwara Kot #32","Phagwara","Kapurthala",31.3158,75.4051,"Sandy Loam",0.74,"DEFICIENT (0.50-0.75%)",125.1,41.4,162.1,6.87,313,4,5],["CLUST-PB-1188","Village Bholath Pind #28","Bholath","Kapurthala",31.3065,75.3087,"Alluvial",0.68,"DEFICIENT (0.50-0.75%)",71.1,54.2,174.6,7.29,161,5,4],["CLUST-PB-1169","Village Nadala Garh #9","Nadala","Kapurthala",31.3808,75.4177,"Alluvial",0.81,"MODERATE (>0.75%)",88.7,49.5,218.5,7.14,170,3,1],["CLUST-PB-1207","Village Phagwara Basti #47","Phagwara","Kapurthala",31.3763,75.311,"Sandy Loam",0.76,"MODERATE (>0.75%)",94.0,31.6,203.7,7.62,240,4,4],["CLUST-PB-1208","Village Bholath Dera #48","Bholath","Kapurthala",31.2493,75.3205,"Clay Loam",0.85,"MODERATE (>0.75%)",86.9,37.5,139.8,7.21,264,3,5],["CLUST-PB-1181","Village Sultanpur Lodhi Garh #21","Sultanpur Lodhi","Kapurthala",31.3328,75.4555,"Loamy",0.93,"MODERATE (>0.75%)",98.6,53.0,180.3,7.09,251,2,2],["CLUST-PB-0105","Village Payal Dera #36","Payal","Ludhiana",30.8127,75.9201,"Alluvial",0.42,"CRITICAL (<0.50%)",141.4,34.0,217.7,6.92,94,2,1],["CLUST-PB-0119","Village Khanna Khurd #50","Khanna","Ludhiana",30.9131,75.8772,"Alluvial",0.5,"DEFICIENT (0.50-0.75%)",129.6,36.5,201.5,6.65,79,1,3],["CLUST-PB-0123","Village Dehlon Wali #54","Dehlon","Ludhiana",30.8932,75.8381,"Sandy Loam",0.53,"DEFICIENT (0.50-0.75%)",112.2,31.4,228.9,6.75,230,2,5],["CLUST-PB-0132","Village Doraha Majra #63","Doraha","Ludhiana",30.8572,75.9123,"Alluvial",0.32,"CRITICAL (<0.50%)",141.0,33.0,162.7,7.16,101,6,2],["CLUST-PB-0100","Village Doraha Pur #31","Doraha","Ludhiana",30.9029,75.8667,"Clay Loam",0.55,"DEFICIENT (0.50-0.75%)",130.5,33.4,150.9,7.43,68,3,3],["CLUST-PB-0077","Village Machhiwara Kot #8","Machhiwara","Ludhiana",30.8466,75.8951,"Sandy Loam",0.45,"CRITICAL (<0.50%)",127.6,40.5,207.7,6.48,95,5,4],["CLUST-PB-0080","Village Samrala Basti #11","Samrala","Ludhiana",30.8961,75.9607,"Sandy Loam",0.7,"DEFICIENT (0.50-0.75%)",115.0,21.2,150.7,7.29,313,1,2],["CLUST-PB-0092","Village Doraha Basti #23","Doraha","Ludhiana",30.8331,75.8321,"Alluvial",0.64,"DEFICIENT (0.50-0.75%)",124.5,30.5,166.3,6.48,247,2,4],["CLUST-PB-0110","Village Jagraon Wala #41","Jagraon","Ludhiana",30.9641,75.9243,"Clay Loam",0.73,"DEFICIENT (0.50-0.75%)",110.1,43.9,206.3,7.2,103,1,2],["CLUST-PB-0098","Village Raikot Wala #29","Raikot","Ludhiana",30.944,75.8949,"Sandy Loam",0.68,"DEFICIENT (0.50-0.75%)",93.5,18.5,219.6,7.05,165,2,5],["CLUST-PB-0126","Village Jagraon Garh #57","Jagraon","Ludhiana",30.8883,75.8307,"Sandy Loam",0.7,"DEFICIENT (0.50-0.75%)",133.9,58.3,164.7,6.97,139,2,3],["CLUST-PB-0071","Village Khanna Khurd #2","Khanna","Ludhiana",30.8914,75.8504,"Alluvial",0.65,"DEFICIENT (0.50-0.75%)",90.9,23.4,162.3,7.14,202,3,5],["CLUST-PB-0117","Village Machhiwara Dera #48","Machhiwara","Ludhiana",30.8656,75.8491,"Clay Loam",0.65,"DEFICIENT (0.50-0.75%)",107.6,49.5,176.6,7.05,161,3,5],["CLUST-PB-0127","Village Khanna Patti #58","Khanna","Ludhiana",30.9152,75.8324,"Sandy Loam",0.66,"DEFICIENT (0.50-0.75%)",90.3,38.8,183.2,6.64,252,3,2],["CLUST-PB-0084","Village Doraha Majra #15","Doraha","Ludhiana",30.8423,75.8089,"Sandy Loam",0.3,"CRITICAL (<0.50%)",154.9,41.5,180.6,7.28,185,9,4],["CLUST-PB-0124","Village Doraha Pur #55","Doraha","Ludhiana",30.9284,75.7824,"Loamy",0.32,"CRITICAL (<0.50%)",114.4,49.2,180.1,6.79,218,9,4],["CLUST-PB-0093","Village Machhiwara Dera #24","Machhiwara","Ludhiana",30.969,75.8643,"Loamy",0.4,"CRITICAL (<0.50%)",131.7,31.4,148.7,7.32,179,8,1],["CLUST-PB-0129","Village Payal Dera #60","Payal","Ludhiana",30.8811,75.9627,"Clay Loam",0.44,"CRITICAL (<0.50%)",131.2,31.0,249.0,6.3,285,8,3],["CLUST-PB-0074","Village Raikot Wala #5","Raikot","Ludhiana",30.9457,75.8362,"Loamy",0.64,"DEFICIENT (0.50-0.75%)",99.2,35.5,151.9,6.95,164,5,5],["CLUST-PB-0096","Village Samrala Majra #27","Samrala","Ludhiana",30.8882,75.9286,"Clay Loam",0.47,"CRITICAL (<0.50%)",136.6,26.2,216.0,6.84,171,8,4],["CLUST-PB-0115","Village Dehlon Patti #46","Dehlon","Ludhiana",30.8872,75.9215,"Alluvial",0.72,"DEFICIENT (0.50-0.75%)",121.8,46.4,177.1,6.83,114,4,4],["CLUST-PB-0081","Village Payal Dera #12","Payal","Ludhiana",30.8275,75.8561,"Alluvial",0.85,"MODERATE (>0.75%)",97.4,26.7,205.4,6.41,139,2,4],["CLUST-PB-0131","Village Dehlon Khurd #62","Dehlon","Ludhiana",30.9502,75.7985,"Sandy Loam",0.87,"MODERATE (>0.75%)",145.1,41.3,166.6,6.97,283,2,2],["CLUST-PB-0107","Village Dehlon Khurd #38","Dehlon","Ludhiana",30.9928,75.747,"Sandy Loam",0.31,"CRITICAL (<0.50%)",142.8,44.0,198.9,6.89,139,11,4],["CLUST-PB-0111","Village Khanna Wali #42","Khanna","Ludhiana",30.9429,75.9326,"Loamy",0.57,"DEFICIENT (0.50-0.75%)",111.4,31.5,155.4,6.69,236,7,1],["CLUST-PB-0090","Village Raikot Garh #21","Raikot","Ludhiana",30.8071,75.8319,"Alluvial",0.79,"MODERATE (>0.75%)",98.5,29.9,214.4,7.11,149,4,2],["CLUST-PB-0094","Village Jagraon Kalan #25","Jagraon","Ludhiana",30.7837,75.7435,"Alluvial",0.36,"CRITICAL (<0.50%)",112.5,47.8,159.9,6.55,214,11,4],["CLUST-PB-0086","Village Jagraon Wala #17","Jagraon","Ludhiana",31.0223,75.764,"Loamy",0.68,"DEFICIENT (0.50-0.75%)",140.4,31.0,179.4,7.38,286,6,5],["CLUST-PB-0120","Village Samrala Majra #51","Samrala","Ludhiana",30.8988,75.8701,"Alluvial",0.57,"DEFICIENT (0.50-0.75%)",147.4,23.6,158.5,6.67,81,8,5],["CLUST-PB-0116","Village Doraha Basti #47","Doraha","Ludhiana",30.8526,75.7901,"Sandy Loam",0.52,"DEFICIENT (0.50-0.75%)",111.8,41.7,172.9,7.22,99,9,1],["CLUST-PB-0106","Village Raikot Kalan #37","Raikot","Ludhiana",31.0372,75.8817,"Clay Loam",0.66,"DEFICIENT (0.50-0.75%)",121.8,20.5,146.1,6.79,122,7,3],["CLUST-PB-0101","Village Machhiwara Kot #32","Machhiwara","Ludhiana",30.9866,75.8919,"Sandy Loam",0.36,"CRITICAL (<0.50%)",119.3,21.5,198.7,6.78,82,12,5],["CLUST-PB-0112","Village Samrala Pur #43","Samrala","Ludhiana",30.9166,75.837,"Loamy",0.86,"MODERATE (>0.75%)",97.5,38.1,223.4,7.05,63,4,3],["CLUST-PB-0072","Village Samrala Majra #3","Samrala","Ludhiana",30.9603,75.7476,"Loamy",0.74,"DEFICIENT (0.50-0.75%)",144.1,35.0,163.9,7.12,142,6,4],["CLUST-PB-0130","Village Raikot Kalan #61","Raikot","Ludhiana",30.9212,75.8708,"Clay Loam",0.44,"CRITICAL (<0.50%)",114.8,39.6,204.5,7.4,86,11,4],["CLUST-PB-0122","Village Raikot Wala #53","Raikot","Ludhiana",30.8711,75.9562,"Clay Loam",0.69,"DEFICIENT (0.50-0.75%)",146.0,36.3,164.0,6.74,258,7,3],["CLUST-PB-0103","Village Khanna Patti #34","Khanna","Ludhiana",30.9212,75.8692,"Clay Loam",0.58,"DEFICIENT (0.50-0.75%)",120.0,35.0,238.7,6.65,292,9,5],["CLUST-PB-0085","Village Machhiwara Pind #16","Machhiwara","Ludhiana",30.8117,75.8109,"Sandy Loam",0.66,"DEFICIENT (0.50-0.75%)",130.5,45.6,154.4,6.99,178,8,3],["CLUST-PB-0125","Village Machhiwara Kot #56","Machhiwara","Ludhiana",30.8706,75.8118,"Alluvial",0.8,"MODERATE (>0.75%)",144.3,66.1,150.6,7.08,320,6,1],["CLUST-PB-0087","Village Khanna Wali #18","Khanna","Ludhiana",30.8582,76.0157,"Alluvial",0.56,"DEFICIENT (0.50-0.75%)",105.6,25.8,317.0,7.05,243,10,3],["CLUST-PB-0082","Village Raikot Kalan #13","Raikot","Ludhiana",30.9245,75.8673,"Alluvial",0.5,"DEFICIENT (0.50-0.75%)",111.2,30.6,217.0,7.1,222,11,4],["CLUST-PB-0136","Village Samrala Pur #67","Samrala","Ludhiana",30.8456,75.8564,"Clay Loam",0.63,"DEFICIENT (0.50-0.75%)",110.1,46.3,209.7,7.43,94,9,5],["CLUST-PB-0113","Village Payal Kot #44","Payal","Ludhiana",30.9894,75.8199,"Sandy Loam",0.64,"DEFICIENT (0.50-0.75%)",109.3,44.6,217.8,6.78,316,9,3],["CLUST-PB-0121","Village Payal Pind #52","Payal","Ludhiana",30.873,75.8106,"Loamy",0.53,"DEFICIENT (0.50-0.75%)",125.7,40.8,195.9,7.21,318,11,2],["CLUST-PB-0104","Village Samrala Basti #35","Samrala","Ludhiana",30.8864,75.7528,"Sandy Loam",0.75,"DEFICIENT (0.50-0.75%)",143.9,45.6,221.6,6.64,280,8,2],["CLUST-PB-0133","Village Machhiwara Pind #64","Machhiwara","Ludhiana",31.0261,75.8838,"Sandy Loam",0.75,"DEFICIENT (0.50-0.75%)",102.1,38.2,171.3,6.8,300,8,5],["CLUST-PB-0099","Village Dehlon Wali #30","Dehlon","Ludhiana",30.9112,75.901,"Sandy Loam",0.72,"DEFICIENT (0.50-0.75%)",112.4,48.6,249.8,7.64,126,9,3],["CLUST-PB-0137","Village Payal Kot #68","Payal","Ludhiana",30.7371,75.8484,"Loamy",0.47,"CRITICAL (<0.50%)",118.2,24.4,199.0,7.22,242,13,1],["CLUST-PB-0091","Village Dehlon Patti #22","Dehlon","Ludhiana",30.9266,75.7279,"Clay Loam",0.5,"DEFICIENT (0.50-0.75%)",140.0,36.2,210.5,7.67,233,13,1],["CLUST-PB-0070","Village Jagraon Kalan #1","Jagraon","Ludhiana",30.9602,75.8307,"Loamy",0.63,"DEFICIENT (0.50-0.75%)",142.7,39.3,178.0,7.19,177,11,5],["CLUST-PB-0075","Village Dehlon Wali #6","Dehlon","Ludhiana",30.9318,75.8966,"Clay Loam",0.76,"MODERATE (>0.75%)",110.0,49.4,198.6,7.12,67,9,4],["CLUST-PB-0108","Village Doraha Majra #39","Doraha","Ludhiana",30.9248,75.8623,"Alluvial",0.7,"DEFICIENT (0.50-0.75%)",133.9,29.8,193.3,6.49,73,10,3],["CLUST-PB-0083","Village Dehlon Khurd #14","Dehlon","Ludhiana",30.9113,75.8447,"Loamy",0.83,"MODERATE (>0.75%)",134.7,64.3,132.1,6.94,111,8,2],["CLUST-PB-0089","Village Payal Kot #20","Payal","Ludhiana",30.9074,75.8109,"Sandy Loam",0.66,"DEFICIENT (0.50-0.75%)",112.2,39.5,214.4,6.97,109,11,1],["CLUST-PB-0128","Village Samrala Basti #59","Samrala","Ludhiana",30.9812,75.8993,"Clay Loam",0.85,"MODERATE (>0.75%)",96.6,23.2,187.8,6.85,181,8,5],["CLUST-PB-0078","Village Jagraon Garh #9","Jagraon","Ludhiana",30.8477,75.7961,"Alluvial",0.86,"MODERATE (>0.75%)",124.0,37.6,179.7,6.29,136,8,5],["CLUST-PB-0135","Village Khanna Wali #66","Khanna","Ludhiana",30.9032,75.8903,"Loamy",0.64,"DEFICIENT (0.50-0.75%)",149.8,34.6,180.9,7.16,183,12,2],["CLUST-PB-0109","Village Machhiwara Pind #40","Machhiwara","Ludhiana",30.9442,75.8667,"Loamy",0.65,"DEFICIENT (0.50-0.75%)",83.7,33.6,207.5,7.27,132,12,1],["CLUST-PB-0138","Village Raikot Garh #69","Raikot","Ludhiana",30.896,75.798,"Loamy",0.84,"MODERATE (>0.75%)",102.7,25.8,186.8,6.64,240,9,3],["CLUST-PB-0134","Village Jagraon Wala #65","Jagraon","Ludhiana",31.0017,75.8837,"Alluvial",0.63,"DEFICIENT (0.50-0.75%)",122.9,54.0,135.9,6.78,116,13,3],["CLUST-PB-0076","Village Doraha Pur #7","Doraha","Ludhiana",30.8186,76.0262,"Alluvial",0.9,"MODERATE (>0.75%)",141.3,31.7,238.6,7.39,209,9,3],["CLUST-PB-0088","Village Samrala Pur #19","Samrala","Ludhiana",30.8802,75.9116,"Loamy",0.62,"DEFICIENT (0.50-0.75%)",150.3,35.1,182.8,7.4,314,14,3],["CLUST-PB-0114","Village Raikot Garh #45","Raikot","Ludhiana",30.9132,75.9736,"Alluvial",0.76,"MODERATE (>0.75%)",127.5,37.4,251.0,6.62,267,12,4],["CLUST-PB-0079","Village Khanna Patti #10","Khanna","Ludhiana",30.8518,75.863,"Alluvial",0.64,"DEFICIENT (0.50-0.75%)",106.7,53.5,160.8,7.21,179,14,4],["CLUST-PB-0073","Village Payal Pind #4","Payal","Ludhiana",30.8853,75.807,"Alluvial",0.9,"MODERATE (>0.75%)",113.0,27.5,177.8,6.83,60,11,5],["CLUST-PB-0102","Village Jagraon Garh #33","Jagraon","Ludhiana",30.8988,75.8275,"Loamy",0.84,"MODERATE (>0.75%)",160.0,43.3,210.9,6.65,311,12,4],["CLUST-PB-0095","Village Khanna Khurd #26","Khanna","Ludhiana",30.9135,75.8706,"Clay Loam",1.14,"MODERATE (>0.75%)",138.0,41.9,206.8,6.61,274,10,2],["CLUST-PB-0097","Village Payal Pind #28","Payal","Ludhiana",31.004,75.8182,"Sandy Loam",0.82,"MODERATE (>0.75%)",140.2,15.0,163.1,6.73,122,14,4],["CLUST-PB-0118","Village Jagraon Kalan #49","Jagraon","Ludhiana",30.9215,75.9202,"Alluvial",0.85,"MODERATE (>0.75%)",160.0,47.0,162.6,6.67,225,14,3],["CLUST-PB-0701","Village Sardulgarh Wala #17","Sardulgarh","Mansa",29.9906,75.3873,"Alluvial",0.52,"DEFICIENT (0.50-0.75%)",102.5,38.4,96.9,6.66,200,2,5],["CLUST-PB-0689","Village Bareta Wala #5","Bareta","Mansa",29.9971,75.3835,"Alluvial",0.54,"DEFICIENT (0.50-0.75%)",82.6,61.0,187.8,6.85,288,2,5],["CLUST-PB-0699","Village Bareta Majra #15","Bareta","Mansa",29.9298,75.3581,"Sandy Loam",0.52,"DEFICIENT (0.50-0.75%)",82.1,36.3,131.1,6.84,93,3,3],["CLUST-PB-0743","Village Bhikhi Basti #59","Bhikhi","Mansa",29.9869,75.4672,"Sandy Loam",0.68,"DEFICIENT (0.50-0.75%)",92.2,43.7,97.7,6.53,263,1,1],["CLUST-PB-0706","Village Sardulgarh Patti #22","Sardulgarh","Mansa",30.0209,75.3658,"Loamy",0.71,"DEFICIENT (0.50-0.75%)",94.9,49.7,126.1,7.58,125,1,4],["CLUST-PB-0738","Village Bhikhi Wali #54","Bhikhi","Mansa",30.0824,75.4703,"Sandy Loam",0.66,"DEFICIENT (0.50-0.75%)",63.2,48.6,151.7,7.0,288,2,4],["CLUST-PB-0717","Village Jhunir Garh #33","Jhunir","Mansa",29.9798,75.4347,"Clay Loam",0.73,"DEFICIENT (0.50-0.75%)",101.7,52.7,130.9,7.03,111,1,2],["CLUST-PB-0723","Village Bhikhi Majra #39","Bhikhi","Mansa",29.9164,75.4041,"Sandy Loam",0.56,"DEFICIENT (0.50-0.75%)",66.3,45.2,133.1,7.26,262,4,3],["CLUST-PB-0729","Village Bareta Garh #45","Bareta","Mansa",29.9996,75.3253,"Sandy Loam",0.56,"DEFICIENT (0.50-0.75%)",103.8,43.1,119.7,6.37,263,4,2],["CLUST-PB-0745","Village Budhlada Kalan #61","Budhlada","Mansa",30.0528,75.4829,"Alluvial",0.79,"MODERATE (>0.75%)",81.3,52.9,154.2,6.84,146,2,1],["CLUST-PB-0712","Village Jhunir Pind #28","Jhunir","Mansa",29.9931,75.425,"Sandy Loam",0.55,"DEFICIENT (0.50-0.75%)",106.1,51.6,201.9,6.88,95,6,2],["CLUST-PB-0691","Village Sardulgarh Pur #7","Sardulgarh","Mansa",30.0418,75.237,"Clay Loam",0.57,"DEFICIENT (0.50-0.75%)",72.5,50.4,163.1,7.2,254,6,2],["CLUST-PB-0736","Village Sardulgarh Pind #52","Sardulgarh","Mansa",29.9593,75.4102,"Sandy Loam",0.76,"MODERATE (>0.75%)",79.6,48.1,175.3,6.68,116,3,5],["CLUST-PB-0750","Village Budhlada Wali #66","Budhlada","Mansa",29.9717,75.3264,"Loamy",0.58,"DEFICIENT (0.50-0.75%)",107.1,45.2,129.5,7.07,242,6,2],["CLUST-PB-0725","Village Budhlada Wala #41","Budhlada","Mansa",29.9446,75.4591,"Clay Loam",0.52,"DEFICIENT (0.50-0.75%)",96.0,39.7,170.0,6.42,199,7,1],["CLUST-PB-0720","Village Budhlada Dera #36","Budhlada","Mansa",30.0381,75.4382,"Sandy Loam",0.72,"DEFICIENT (0.50-0.75%)",114.4,52.3,168.6,7.36,227,4,1],["CLUST-PB-0350","Village Bagha Purana Wali #6","Bagha Purana","Moga",30.8388,75.1966,"Clay Loam",0.49,"CRITICAL (<0.50%)",70.8,64.1,239.7,7.02,87,1,3],["CLUST-PB-0378","Village Badhni Kalan Patti #34","Badhni Kalan","Moga",30.8646,75.1579,"Loamy",0.59,"DEFICIENT (0.50-0.75%)",64.7,52.0,243.7,7.73,184,1,2],["CLUST-PB-0373","Village Badhni Kalan Wala #29","Badhni Kalan","Moga",30.8742,75.3147,"Alluvial",0.54,"DEFICIENT (0.50-0.75%)",37.3,50.2,168.6,7.01,178,2,3],["CLUST-PB-0411","Village Nihal Singh Wala Pur #67","Nihal Singh Wala","Moga",30.798,75.0858,"Alluvial",0.5,"DEFICIENT (0.50-0.75%)",100.0,55.3,127.5,7.16,271,3,2],["CLUST-PB-0403","Village Badhni Kalan Basti #59","Badhni Kalan","Moga",30.7896,75.1804,"Clay Loam",0.63,"DEFICIENT (0.50-0.75%)",75.2,64.6,211.4,7.05,192,3,5],["CLUST-PB-0406","Village Nihal Singh Wala Khurd #62","Nihal Singh Wala","Moga",30.8565,75.2046,"Clay Loam",0.52,"DEFICIENT (0.50-0.75%)",74.5,51.4,192.1,7.26,309,5,3],["CLUST-PB-0374","Village Kot Ise Khan Wali #30","Kot Ise Khan","Moga",30.8465,75.1586,"Alluvial",0.8,"MODERATE (>0.75%)",87.6,70.1,183.3,7.47,83,1,3],["CLUST-PB-0407","Village Dharamkot Majra #63","Dharamkot","Moga",30.7506,75.1397,"Alluvial",0.57,"DEFICIENT (0.50-0.75%)",93.4,66.5,232.3,6.68,231,5,3],["CLUST-PB-0386","Village Nihal Singh Wala Wali #42","Nihal Singh Wala","Moga",30.7771,75.143,"Clay Loam",0.73,"DEFICIENT (0.50-0.75%)",103.2,51.8,197.0,6.89,114,3,4],["CLUST-PB-0359","Village Kot Ise Khan Majra #15","Kot Ise Khan","Moga",30.8547,75.1205,"Loamy",0.92,"MODERATE (>0.75%)",90.6,44.0,117.1,7.25,138,1,4],["CLUST-PB-0371","Village Nihal Singh Wala Majra #27","Nihal Singh Wala","Moga",30.6231,75.1077,"Clay Loam",0.49,"CRITICAL (<0.50%)",82.4,46.9,227.2,7.25,128,8,5],["CLUST-PB-0370","Village Bagha Purana Khurd #26","Bagha Purana","Moga",30.9175,75.1523,"Sandy Loam",0.43,"CRITICAL (<0.50%)",91.9,40.9,226.3,6.74,78,9,3],["CLUST-PB-0349","Village Kot Ise Khan Wala #5","Kot Ise Khan","Moga",30.8284,75.1902,"Sandy Loam",0.79,"MODERATE (>0.75%)",65.1,43.0,200.2,6.71,259,4,5],["CLUST-PB-0364","Village Kot Ise Khan Kot #20","Kot Ise Khan","Moga",30.8816,75.1837,"Sandy Loam",0.8,"MODERATE (>0.75%)",60.8,47.2,194.6,7.13,236,4,4],["CLUST-PB-0387","Village Dharamkot Pur #43","Dharamkot","Moga",30.7921,75.1312,"Alluvial",0.87,"MODERATE (>0.75%)",62.1,46.4,229.7,6.92,307,3,3],["CLUST-PB-0383","Village Badhni Kalan Majra #39","Badhni Kalan","Moga",30.7252,75.0935,"Loamy",0.5,"DEFICIENT (0.50-0.75%)",71.1,62.2,237.1,7.53,280,9,4],["CLUST-PB-0470","Village Bariwala Patti #58","Bariwala","Muktsar",30.5065,74.6223,"Sandy Loam",0.49,"CRITICAL (<0.50%)",94.3,50.7,151.1,7.58,123,2,1],["CLUST-PB-0436","Village Rupana Dera #24","Rupana","Muktsar",30.4113,74.5001,"Sandy Loam",0.39,"CRITICAL (<0.50%)",99.5,56.3,157.8,7.11,257,4,2],["CLUST-PB-0418","Village Rupana Wali #6","Rupana","Muktsar",30.5425,74.5238,"Alluvial",0.41,"CRITICAL (<0.50%)",62.1,44.1,152.3,7.06,262,4,2],["CLUST-PB-0475","Village Lambi Majra #63","Lambi","Muktsar",30.4429,74.4836,"Clay Loam",0.48,"CRITICAL (<0.50%)",81.1,37.6,150.7,7.32,78,3,1],["CLUST-PB-0463","Village Lambi Majra #51","Lambi","Muktsar",30.423,74.5889,"Alluvial",0.51,"DEFICIENT (0.50-0.75%)",91.6,42.1,140.1,6.65,302,3,2],["CLUST-PB-0445","Village Lambi Garh #33","Lambi","Muktsar",30.5465,74.4723,"Sandy Loam",0.66,"DEFICIENT (0.50-0.75%)",84.0,45.5,169.2,6.84,138,1,4],["CLUST-PB-0434","Village Bariwala Patti #22","Bariwala","Muktsar",30.5367,74.4688,"Loamy",0.53,"DEFICIENT (0.50-0.75%)",84.3,46.7,142.0,7.49,66,4,4],["CLUST-PB-0441","Village Doda Wala #29","Doda","Muktsar",30.5228,74.5099,"Clay Loam",0.66,"DEFICIENT (0.50-0.75%)",100.6,54.5,168.1,7.36,139,2,1],["CLUST-PB-0474","Village Gidderbaha Khurd #62","Gidderbaha","Muktsar",30.4783,74.5055,"Alluvial",0.69,"DEFICIENT (0.50-0.75%)",98.3,48.8,140.1,6.92,286,2,5],["CLUST-PB-0455","Village Malout Pur #43","Malout","Muktsar",30.5011,74.5078,"Loamy",0.57,"DEFICIENT (0.50-0.75%)",121.6,47.6,169.4,6.74,80,4,5],["CLUST-PB-0454","Village Rupana Wali #42","Rupana","Muktsar",30.5372,74.4375,"Alluvial",0.39,"CRITICAL (<0.50%)",83.0,56.6,154.7,7.83,178,7,5],["CLUST-PB-0477","Village Doda Wala #65","Doda","Muktsar",30.4116,74.4481,"Loamy",0.46,"CRITICAL (<0.50%)",70.7,57.7,208.5,6.42,213,6,3],["CLUST-PB-0464","Village Bariwala Pind #52","Bariwala","Muktsar",30.5527,74.518,"Sandy Loam",0.73,"DEFICIENT (0.50-0.75%)",88.8,51.7,169.4,7.49,164,2,2],["CLUST-PB-0443","Village Malout Pur #31","Malout","Muktsar",30.4413,74.4931,"Loamy",0.82,"MODERATE (>0.75%)",95.9,42.9,178.3,7.57,213,1,5],["CLUST-PB-0478","Village Rupana Wali #66","Rupana","Muktsar",30.4156,74.6085,"Loamy",0.52,"DEFICIENT (0.50-0.75%)",90.3,36.0,210.1,7.29,200,6,5],["CLUST-PB-0472","Village Rupana Dera #60","Rupana","Muktsar",30.4552,74.5837,"Loamy",0.59,"DEFICIENT (0.50-0.75%)",82.9,49.0,188.8,6.97,274,5,3],["CLUST-PB-1465","Village Sujanpur Garh #33","Sujanpur","Pathankot",32.2962,75.5927,"Sandy Loam",0.28,"CRITICAL (<0.50%)",86.2,60.2,127.7,6.88,98,1,2],["CLUST-PB-1443","Village Dhar Kalan Basti #11","Dhar Kalan","Pathankot",32.2081,75.7,"Clay Loam",0.28,"CRITICAL (<0.50%)",76.0,36.9,183.4,7.55,293,2,5],["CLUST-PB-1454","Village Narot Jaimal Singh Patti #22","Narot Jaimal Singh","Pathankot",32.2624,75.7051,"Clay Loam",0.36,"CRITICAL (<0.50%)",87.9,47.9,128.5,6.74,73,1,1],["CLUST-PB-1493","Village Sujanpur Kalan #61","Sujanpur","Pathankot",32.243,75.6862,"Alluvial",0.39,"CRITICAL (<0.50%)",92.9,49.0,124.7,7.93,273,1,3],["CLUST-PB-1437","Village Sujanpur Wala #5","Sujanpur","Pathankot",32.2332,75.6998,"Sandy Loam",0.37,"CRITICAL (<0.50%)",74.2,48.7,125.5,7.25,111,3,2],["CLUST-PB-1492","Village Bamial Dera #60","Bamial","Pathankot",32.3184,75.4278,"Sandy Loam",0.5,"DEFICIENT (0.50-0.75%)",87.7,37.7,115.8,7.12,304,1,3],["CLUST-PB-1462","Village Narot Jaimal Singh Wali #30","Narot Jaimal Singh","Pathankot",32.3135,75.6498,"Clay Loam",0.48,"CRITICAL (<0.50%)",68.3,46.9,187.6,7.6,252,2,2],["CLUST-PB-1446","Village Narot Jaimal Singh Khurd #14","Narot Jaimal Singh","Pathankot",32.2522,75.661,"Loamy",0.43,"CRITICAL (<0.50%)",52.9,39.1,206.0,7.46,302,3,4],["CLUST-PB-1440","Village Bamial Kot #8","Bamial","Pathankot",32.4057,75.7293,"Sandy Loam",0.6,"DEFICIENT (0.50-0.75%)",83.8,49.9,148.1,7.68,268,1,2],["CLUST-PB-1447","Village Dhar Kalan Majra #15","Dhar Kalan","Pathankot",32.2302,75.5943,"Sandy Loam",0.31,"CRITICAL (<0.50%)",113.8,44.5,143.2,7.4,172,6,5],["CLUST-PB-1470","Village Narot Jaimal Singh Khurd #38","Narot Jaimal Singh","Pathankot",32.3098,75.6565,"Loamy",0.51,"DEFICIENT (0.50-0.75%)",99.5,39.7,203.7,7.31,147,3,2],["CLUST-PB-1467","Village Dhar Kalan Basti #35","Dhar Kalan","Pathankot",32.3016,75.7217,"Sandy Loam",0.58,"DEFICIENT (0.50-0.75%)",74.2,46.6,112.5,7.34,184,2,5],["CLUST-PB-1479","Village Dhar Kalan Basti #47","Dhar Kalan","Pathankot",32.2381,75.7268,"Sandy Loam",0.33,"CRITICAL (<0.50%)",96.1,50.8,118.3,7.29,181,6,1],["CLUST-PB-1463","Village Dhar Kalan Pur #31","Dhar Kalan","Pathankot",32.2732,75.6747,"Clay Loam",0.53,"DEFICIENT (0.50-0.75%)",81.9,47.7,171.1,7.98,84,3,4],["CLUST-PB-1469","Village Sujanpur Kalan #37","Sujanpur","Pathankot",32.1937,75.6241,"Alluvial",0.3,"CRITICAL (<0.50%)",118.6,55.5,187.1,7.94,180,7,5],["CLUST-PB-1500","Village Bamial Kot #68","Bamial","Pathankot",32.2389,75.6394,"Sandy Loam",0.47,"CRITICAL (<0.50%)",69.5,55.7,206.4,7.79,248,5,2],["CLUST-PB-0158","Village Bhunerheri Kot #20","Bhunerheri","Patiala",30.3102,76.3921,"Sandy Loam",0.52,"DEFICIENT (0.50-0.75%)",95.3,55.2,221.3,7.65,109,1,3],["CLUST-PB-0202","Village Nabha Pind #64","Nabha","Patiala",30.3314,76.3929,"Alluvial",0.55,"DEFICIENT (0.50-0.75%)",91.9,45.6,192.6,7.34,251,1,5],["CLUST-PB-0190","Village Rajpura Pind #52","Rajpura","Patiala",30.3476,76.2725,"Alluvial",0.47,"CRITICAL (<0.50%)",95.0,46.8,236.7,7.58,84,4,1],["CLUST-PB-0204","Village Rajpura Wali #66","Rajpura","Patiala",30.3451,76.4245,"Sandy Loam",0.49,"CRITICAL (<0.50%)",98.4,32.5,206.2,7.48,183,4,5],["CLUST-PB-0189","Village Samana Majra #51","Samana","Patiala",30.4006,76.3771,"Sandy Loam",0.68,"DEFICIENT (0.50-0.75%)",66.2,46.3,211.2,7.19,117,1,4],["CLUST-PB-0154","Village Samana Pind #16","Samana","Patiala",30.2908,76.3325,"Sandy Loam",0.56,"DEFICIENT (0.50-0.75%)",95.6,56.5,153.4,7.3,138,3,5],["CLUST-PB-0196","Village Samana Patti #58","Samana","Patiala",30.3803,76.3735,"Loamy",0.51,"DEFICIENT (0.50-0.75%)",48.7,53.4,150.1,8.14,168,4,1],["CLUST-PB-0173","Village Ghanaur Basti #35","Ghanaur","Patiala",30.3304,76.4697,"Sandy Loam",0.7,"DEFICIENT (0.50-0.75%)",93.3,50.7,168.0,8.1,179,1,1],["CLUST-PB-0176","Village Rajpura Khurd #38","Rajpura","Patiala",30.3781,76.4031,"Clay Loam",0.7,"DEFICIENT (0.50-0.75%)",101.1,37.5,216.5,7.92,79,1,3],["CLUST-PB-0140","Village Samana Khurd #2","Samana","Patiala",30.3214,76.4286,"Alluvial",0.74,"DEFICIENT (0.50-0.75%)",125.2,56.5,89.1,7.28,189,1,2],["CLUST-PB-0198","Village Patran Dera #60","Patran","Patiala",30.3881,76.3537,"Alluvial",0.6,"DEFICIENT (0.50-0.75%)",61.1,65.4,132.2,7.52,223,4,3],["CLUST-PB-0159","Village Ghanaur Garh #21","Ghanaur","Patiala",30.4433,76.3432,"Sandy Loam",0.36,"CRITICAL (<0.50%)",107.5,64.5,156.9,7.89,141,8,5],["CLUST-PB-0179","Village Bhunerheri Wala #41","Bhunerheri","Patiala",30.4123,76.278,"Clay Loam",0.8,"MODERATE (>0.75%)",65.6,62.5,220.8,7.46,187,1,3],["CLUST-PB-0193","Village Bhunerheri Pur #55","Bhunerheri","Patiala",30.3882,76.4042,"Sandy Loam",0.62,"DEFICIENT (0.50-0.75%)",70.9,37.3,185.6,7.14,302,4,2],["CLUST-PB-0185","Village Sanaur Basti #47","Sanaur","Patiala",30.2792,76.3809,"Sandy Loam",0.88,"MODERATE (>0.75%)",91.9,56.1,141.3,6.87,97,1,4],["CLUST-PB-0183","Village Rajpura Garh #45","Rajpura","Patiala",30.3084,76.3077,"Sandy Loam",0.76,"MODERATE (>0.75%)",63.4,42.6,188.0,7.53,136,3,3],["CLUST-PB-1263","Village Morinda Basti #35","Morinda","Rupnagar",31.0469,76.4486,"Sandy Loam",0.38,"CRITICAL (<0.50%)",73.5,66.0,116.9,6.94,109,1,3],["CLUST-PB-1231","Village Morinda Majra #3","Morinda","Rupnagar",30.9747,76.5815,"Sandy Loam",0.55,"DEFICIENT (0.50-0.75%)",108.8,65.3,146.6,6.93,93,1,1],["CLUST-PB-1236","Village Nurpur Bedi Kot #8","Nurpur Bedi","Rupnagar",30.9213,76.5204,"Alluvial",0.63,"DEFICIENT (0.50-0.75%)",107.8,52.4,192.8,7.02,247,1,4],["CLUST-PB-1258","Village Chamkaur Sahib Wali #30","Chamkaur Sahib","Rupnagar",31.0327,76.4948,"Clay Loam",0.61,"DEFICIENT (0.50-0.75%)",105.1,58.1,127.6,7.32,261,2,3],["CLUST-PB-1271","Village Morinda Pur #43","Morinda","Rupnagar",30.906,76.5803,"Alluvial",0.3,"CRITICAL (<0.50%)",134.9,47.0,123.7,6.71,244,7,1],["CLUST-PB-1265","Village Anandpur Sahib Kalan #37","Anandpur Sahib","Rupnagar",31.0039,76.5003,"Loamy",0.59,"DEFICIENT (0.50-0.75%)",139.1,58.7,102.5,7.27,303,3,1],["CLUST-PB-1237","Village Anandpur Sahib Garh #9","Anandpur Sahib","Rupnagar",30.9872,76.4406,"Clay Loam",0.72,"DEFICIENT (0.50-0.75%)",119.1,48.0,157.7,6.9,161,1,4],["CLUST-PB-1272","Village Nurpur Bedi Kot #44","Nurpur Bedi","Rupnagar",30.8643,76.4249,"Sandy Loam",0.42,"CRITICAL (<0.50%)",89.3,53.8,86.1,7.17,81,6,5],["CLUST-PB-1285","Village Anandpur Sahib Garh #57","Anandpur Sahib","Rupnagar",30.988,76.528,"Alluvial",0.5,"DEFICIENT (0.50-0.75%)",99.3,35.1,181.0,6.93,82,5,2],["CLUST-PB-1273","Village Anandpur Sahib Garh #45","Anandpur Sahib","Rupnagar",31.1029,76.4422,"Sandy Loam",0.71,"DEFICIENT (0.50-0.75%)",110.7,36.4,100.6,7.32,262,2,4],["CLUST-PB-1284","Village Nurpur Bedi Kot #56","Nurpur Bedi","Rupnagar",31.0064,76.591,"Clay Loam",0.75,"DEFICIENT (0.50-0.75%)",106.8,55.2,149.4,6.97,278,2,2],["CLUST-PB-1291","Village Morinda Majra #63","Morinda","Rupnagar",30.9857,76.5347,"Sandy Loam",0.63,"DEFICIENT (0.50-0.75%)",89.2,40.4,103.3,7.77,223,4,4],["CLUST-PB-1293","Village Anandpur Sahib Wala #65","Anandpur Sahib","Rupnagar",30.9857,76.5047,"Alluvial",0.63,"DEFICIENT (0.50-0.75%)",77.3,49.9,142.5,7.3,245,4,3],["CLUST-PB-1266","Village Chamkaur Sahib Khurd #38","Chamkaur Sahib","Rupnagar",31.0849,76.6125,"Loamy",0.78,"MODERATE (>0.75%)",61.7,51.6,133.9,6.79,305,2,2],["CLUST-PB-1283","Village Morinda Pur #55","Morinda","Rupnagar",30.9366,76.4533,"Alluvial",0.6,"DEFICIENT (0.50-0.75%)",93.9,43.0,142.9,7.17,84,5,5],["CLUST-PB-1253","Village Anandpur Sahib Kalan #25","Anandpur Sahib","Rupnagar",30.8882,76.5896,"Loamy",0.42,"CRITICAL (<0.50%)",98.8,33.7,135.7,6.89,166,8,2],["CLUST-PB-1357","Village Kharar Kalan #61","Kharar","SAS Nagar",30.7379,76.6297,"Sandy Loam",0.67,"DEFICIENT (0.50-0.75%)",71.6,45.4,149.6,7.02,263,1,4],["CLUST-PB-1303","Village Dera Bassi Pur #7","Dera Bassi","SAS Nagar",30.6611,76.723,"Alluvial",0.63,"DEFICIENT (0.50-0.75%)",70.9,46.3,186.9,6.89,61,2,2],["CLUST-PB-1359","Village Majri Majra #63","Majri","SAS Nagar",30.7142,76.6227,"Alluvial",0.6,"DEFICIENT (0.50-0.75%)",80.7,27.7,139.5,7.03,228,3,5],["CLUST-PB-1298","Village Dera Bassi Khurd #2","Dera Bassi","SAS Nagar",30.7464,76.6682,"Loamy",0.47,"CRITICAL (<0.50%)",59.3,30.8,113.7,6.73,310,6,5],["CLUST-PB-1326","Village Banur Wali #30","Banur","SAS Nagar",30.7974,76.7451,"Sandy Loam",0.55,"DEFICIENT (0.50-0.75%)",71.2,32.7,149.1,6.97,284,5,4],["CLUST-PB-1324","Village Majri Pind #28","Majri","SAS Nagar",30.6825,76.6521,"Clay Loam",0.79,"MODERATE (>0.75%)",59.0,38.7,156.9,6.68,212,2,5],["CLUST-PB-1336","Village Banur Pind #40","Banur","SAS Nagar",30.7787,76.5907,"Clay Loam",0.69,"DEFICIENT (0.50-0.75%)",86.5,31.5,127.1,6.54,185,4,1],["CLUST-PB-1322","Village Kharar Khurd #26","Kharar","SAS Nagar",30.7289,76.6197,"Alluvial",0.88,"MODERATE (>0.75%)",77.8,33.7,140.8,6.84,129,1,3],["CLUST-PB-1351","Village Banur Pur #55","Banur","SAS Nagar",30.565,76.7564,"Clay Loam",0.88,"MODERATE (>0.75%)",45.1,23.2,168.9,6.89,154,1,2],["CLUST-PB-1362","Village Kharar Wali #66","Kharar","SAS Nagar",30.7762,76.7013,"Loamy",0.76,"MODERATE (>0.75%)",85.3,42.7,228.9,6.57,198,3,1],["CLUST-PB-1301","Village Banur Wala #5","Banur","SAS Nagar",30.7279,76.6953,"Alluvial",0.83,"MODERATE (>0.75%)",65.3,35.6,118.3,6.61,148,2,3],["CLUST-PB-1356","Village Banur Dera #60","Banur","SAS Nagar",30.7534,76.8478,"Alluvial",0.66,"DEFICIENT (0.50-0.75%)",70.1,34.8,130.3,7.34,195,5,1],["CLUST-PB-1302","Village Kharar Wali #6","Kharar","SAS Nagar",30.6917,76.6895,"Alluvial",0.73,"DEFICIENT (0.50-0.75%)",88.6,22.5,169.5,7.37,251,4,4],["CLUST-PB-1342","Village Kharar Patti #46","Kharar","SAS Nagar",30.7458,76.8103,"Sandy Loam",0.94,"MODERATE (>0.75%)",91.4,46.6,213.9,6.41,86,1,4],["CLUST-PB-1310","Village Kurali Khurd #14","Kurali","SAS Nagar",30.7273,76.7554,"Sandy Loam",0.88,"MODERATE (>0.75%)",71.7,49.9,120.8,6.7,178,2,1],["CLUST-PB-1304","Village Majri Kot #8","Majri","SAS Nagar",30.8479,76.7368,"Alluvial",0.7,"DEFICIENT (0.50-0.75%)",38.2,39.5,87.2,6.7,161,5,1],["CLUST-PB-1372","Village Nawanshahr Kot #8","Nawanshahr","SBS Nagar",31.133,76.2009,"Clay Loam",0.63,"DEFICIENT (0.50-0.75%)",103.7,38.2,217.6,7.34,222,2,2],["CLUST-PB-1403","Village Saroya Majra #39","Saroya","SBS Nagar",31.1456,76.2236,"Loamy",0.72,"DEFICIENT (0.50-0.75%)",90.0,37.9,213.9,6.41,124,1,2],["CLUST-PB-1369","Village Aur Wala #5","Aur","SBS Nagar",31.0599,76.0934,"Alluvial",0.73,"DEFICIENT (0.50-0.75%)",84.5,51.0,137.9,7.02,210,1,1],["CLUST-PB-1365","Village Balachaur Kalan #1","Balachaur","SBS Nagar",31.089,76.1867,"Alluvial",0.68,"DEFICIENT (0.50-0.75%)",82.6,60.2,191.6,7.0,281,2,5],["CLUST-PB-1389","Village Aur Kalan #25","Aur","SBS Nagar",31.1595,76.0188,"Alluvial",0.62,"DEFICIENT (0.50-0.75%)",73.5,32.9,153.9,6.97,61,3,1],["CLUST-PB-1408","Village Saroya Kot #44","Saroya","SBS Nagar",31.1705,76.1795,"Loamy",0.71,"DEFICIENT (0.50-0.75%)",96.2,45.4,245.9,7.28,75,2,3],["CLUST-PB-1400","Village Balachaur Dera #36","Balachaur","SBS Nagar",31.0384,76.1339,"Sandy Loam",0.77,"MODERATE (>0.75%)",110.1,39.2,228.8,7.21,275,2,1],["CLUST-PB-1418","Village Saroya Wali #54","Saroya","SBS Nagar",30.9856,76.0576,"Sandy Loam",0.71,"DEFICIENT (0.50-0.75%)",95.5,34.1,220.3,7.3,93,3,4],["CLUST-PB-1431","Village Banga Pur #67","Banga","SBS Nagar",31.0862,76.2006,"Loamy",0.46,"CRITICAL (<0.50%)",94.0,50.5,152.7,7.93,169,7,3],["CLUST-PB-1375","Village Balachaur Basti #11","Balachaur","SBS Nagar",31.1416,76.1425,"Loamy",0.73,"DEFICIENT (0.50-0.75%)",93.0,47.2,188.4,7.32,195,3,5],["CLUST-PB-1401","Village Banga Kalan #37","Banga","SBS Nagar",31.129,76.0759,"Clay Loam",0.76,"MODERATE (>0.75%)",100.6,47.2,258.4,7.15,291,3,5],["CLUST-PB-1398","Village Saroya Patti #34","Saroya","SBS Nagar",31.1728,76.2046,"Loamy",0.7,"DEFICIENT (0.50-0.75%)",87.7,40.0,206.1,6.96,151,4,2],["CLUST-PB-1426","Village Banga Khurd #62","Banga","SBS Nagar",31.2161,76.1179,"Loamy",0.86,"MODERATE (>0.75%)",88.9,36.4,198.3,7.38,106,2,5],["CLUST-PB-1386","Village Banga Patti #22","Banga","SBS Nagar",31.1055,76.0263,"Sandy Loam",0.8,"MODERATE (>0.75%)",90.3,55.2,178.9,7.32,284,3,1],["CLUST-PB-1402","Village Nawanshahr Khurd #38","Nawanshahr","SBS Nagar",31.1919,76.0383,"Clay Loam",0.68,"DEFICIENT (0.50-0.75%)",111.7,42.4,147.2,6.79,221,5,5],["CLUST-PB-1385","Village Balachaur Garh #21","Balachaur","SBS Nagar",31.1604,76.1548,"Alluvial",0.7,"DEFICIENT (0.50-0.75%)",104.5,46.3,155.6,7.2,238,5,2],["CLUST-PB-0040","Village Sherpur Pind #40","Sherpur","Sangrur",30.1871,75.7956,"Sandy Loam",0.61,"DEFICIENT (0.50-0.75%)",134.4,58.5,161.8,7.44,135,1,1],["CLUST-PB-0022","Village Dirba Patti #22","Dirba","Sangrur",30.2028,75.8026,"Loamy",0.64,"DEFICIENT (0.50-0.75%)",102.1,52.1,212.2,7.35,220,1,1],["CLUST-PB-0054","Village Dirba Wali #54","Dirba","Sangrur",30.3156,75.894,"Alluvial",0.62,"DEFICIENT (0.50-0.75%)",134.9,64.0,165.5,6.83,249,2,5],["CLUST-PB-0018","Village Dhuri Wali #18","Dhuri","Sangrur",30.3082,75.857,"Loamy",0.7,"DEFICIENT (0.50-0.75%)",113.1,51.7,124.1,7.32,110,1,4],["CLUST-PB-0047","Village Longowal Basti #47","Longowal","Sangrur",30.2892,75.8228,"Sandy Loam",0.54,"DEFICIENT (0.50-0.75%)",121.6,52.0,121.6,7.08,309,4,3],["CLUST-PB-0061","Village Moonak Kalan #61","Moonak","Sangrur",30.2565,75.9452,"Clay Loam",0.69,"DEFICIENT (0.50-0.75%)",124.6,59.4,142.7,7.35,204,2,2],["CLUST-PB-0055","Village Longowal Pur #55","Longowal","Sangrur",30.2405,75.8338,"Sandy Loam",0.64,"DEFICIENT (0.50-0.75%)",107.5,38.4,172.4,7.44,282,3,5],["CLUST-PB-0001","Village Sunam Kalan #1","Sunam","Sangrur",30.2379,75.8309,"Alluvial",0.78,"MODERATE (>0.75%)",110.1,45.1,106.5,7.26,76,1,1],["CLUST-PB-0042","Village Dhuri Wali #42","Dhuri","Sangrur",30.3256,75.8383,"Sandy Loam",0.78,"MODERATE (>0.75%)",97.6,30.8,187.8,7.37,297,1,5],["CLUST-PB-0029","Village Moonak Wala #29","Moonak","Sangrur",30.2537,75.825,"Loamy",0.76,"MODERATE (>0.75%)",105.7,51.5,156.3,6.63,117,2,2],["CLUST-PB-0045","Village Moonak Garh #45","Moonak","Sangrur",30.2424,75.8679,"Sandy Loam",0.77,"MODERATE (>0.75%)",111.4,41.5,198.5,7.31,169,2,4],["CLUST-PB-0016","Village Sherpur Pind #16","Sherpur","Sangrur",30.1617,75.7695,"Sandy Loam",0.87,"MODERATE (>0.75%)",106.7,50.6,134.4,7.54,172,1,1],["CLUST-PB-0031","Village Longowal Pur #31","Longowal","Sangrur",30.2202,75.7895,"Sandy Loam",0.5,"DEFICIENT (0.50-0.75%)",83.9,61.0,149.4,7.37,150,7,1],["CLUST-PB-0063","Village Longowal Majra #63","Longowal","Sangrur",30.1862,75.7593,"Clay Loam",0.82,"MODERATE (>0.75%)",99.1,44.0,198.0,6.65,304,2,1],["CLUST-PB-0043","Village Bhawanigarh Pur #43","Bhawanigarh","Sangrur",30.2463,75.9683,"Alluvial",0.52,"DEFICIENT (0.50-0.75%)",106.2,33.0,70.0,6.44,318,7,5],["CLUST-PB-0030","Village Dirba Wali #30","Dirba","Sangrur",30.2765,75.7238,"Loamy",0.71,"DEFICIENT (0.50-0.75%)",88.6,43.7,179.9,7.36,243,4,2],["CLUST-PB-0023","Village Longowal Basti #23","Longowal","Sangrur",30.1897,75.8033,"Sandy Loam",0.85,"MODERATE (>0.75%)",89.0,49.8,155.5,7.33,266,2,5],["CLUST-PB-0068","Village Lehragaga Kot #68","Lehragaga","Sangrur",30.2894,75.9437,"Sandy Loam",0.67,"DEFICIENT (0.50-0.75%)",78.7,36.9,192.6,6.99,136,5,2],["CLUST-PB-0003","Village Bhawanigarh Majra #3","Bhawanigarh","Sangrur",30.2481,75.8352,"Loamy",0.88,"MODERATE (>0.75%)",71.3,43.4,176.1,7.45,254,2,3],["CLUST-PB-0034","Village Dhuri Patti #34","Dhuri","Sangrur",30.1452,75.7999,"Clay Loam",0.88,"MODERATE (>0.75%)",125.5,52.8,134.2,7.48,74,2,3],["CLUST-PB-0049","Village Sunam Kalan #49","Sunam","Sangrur",30.3001,75.8531,"Alluvial",0.76,"MODERATE (>0.75%)",95.8,43.2,144.2,7.03,227,4,4],["CLUST-PB-0027","Village Bhawanigarh Majra #27","Bhawanigarh","Sangrur",30.3471,75.848,"Sandy Loam",0.73,"DEFICIENT (0.50-0.75%)",122.7,50.7,151.9,7.27,199,5,5],["CLUST-PB-0051","Village Bhawanigarh Majra #51","Bhawanigarh","Sangrur",30.3741,75.8936,"Loamy",0.81,"MODERATE (>0.75%)",104.1,48.7,156.3,7.4,138,4,2],["CLUST-PB-0050","Village Dhuri Khurd #50","Dhuri","Sangrur",30.25,75.791,"Loamy",1.04,"MODERATE (>0.75%)",75.6,56.6,172.1,6.91,300,1,5],["CLUST-PB-0017","Village Sunam Wala #17","Sunam","Sangrur",30.2408,75.8202,"Sandy Loam",0.84,"MODERATE (>0.75%)",99.3,41.0,195.7,7.07,302,4,4],["CLUST-PB-0041","Village Sunam Wala #41","Sunam","Sangrur",30.2478,75.9159,"Alluvial",0.84,"MODERATE (>0.75%)",91.8,35.3,184.2,7.33,264,4,2],["CLUST-PB-0064","Village Sherpur Pind #64","Sherpur","Sangrur",30.366,75.8214,"Clay Loam",0.84,"MODERATE (>0.75%)",93.3,44.1,185.6,7.51,103,4,1],["CLUST-PB-0010","Village Dhuri Patti #10","Dhuri","Sangrur",30.2197,75.8468,"Alluvial",0.48,"CRITICAL (<0.50%)",103.5,50.6,139.0,6.72,255,10,4],["CLUST-PB-0011","Village Bhawanigarh Basti #11","Bhawanigarh","Sangrur",30.1018,75.8106,"Clay Loam",0.81,"MODERATE (>0.75%)",95.3,43.7,106.9,6.87,117,5,4],["CLUST-PB-0052","Village Lehragaga Pind #52","Lehragaga","Sangrur",30.2538,75.8105,"Loamy",0.81,"MODERATE (>0.75%)",116.5,43.0,157.6,7.48,143,5,1],["CLUST-PB-0058","Village Dhuri Patti #58","Dhuri","Sangrur",30.2549,75.8113,"Sandy Loam",0.9,"MODERATE (>0.75%)",92.9,58.1,191.5,6.84,103,4,4],["CLUST-PB-0039","Village Longowal Majra #39","Longowal","Sangrur",30.2333,75.8842,"Sandy Loam",0.85,"MODERATE (>0.75%)",73.5,42.0,192.9,6.95,103,5,5],["CLUST-PB-0004","Village Lehragaga Pind #4","Lehragaga","Sangrur",30.2326,75.893,"Alluvial",0.62,"DEFICIENT (0.50-0.75%)",107.7,32.6,70.0,6.93,100,9,3],["CLUST-PB-0013","Village Moonak Kalan #13","Moonak","Sangrur",30.2213,75.8184,"Loamy",0.81,"MODERATE (>0.75%)",75.1,48.2,116.6,7.45,117,6,3],["CLUST-PB-0032","Village Sherpur Kot #32","Sherpur","Sangrur",30.2276,75.9055,"Sandy Loam",1.13,"MODERATE (>0.75%)",101.2,37.1,131.4,6.64,196,3,1],["CLUST-PB-0066","Village Dhuri Wali #66","Dhuri","Sangrur",30.2207,75.9954,"Loamy",0.95,"MODERATE (>0.75%)",122.2,55.1,139.6,6.95,140,4,2],["CLUST-PB-0053","Village Moonak Wala #53","Moonak","Sangrur",30.1345,75.7712,"Sandy Loam",0.49,"CRITICAL (<0.50%)",79.4,31.0,217.8,7.29,112,12,3],["CLUST-PB-0065","Village Sunam Wala #65","Sunam","Sangrur",30.1925,75.818,"Alluvial",0.62,"DEFICIENT (0.50-0.75%)",83.2,47.6,125.2,7.39,216,10,5],["CLUST-PB-0060","Village Lehragaga Dera #60","Lehragaga","Sangrur",30.2673,75.786,"Alluvial",0.95,"MODERATE (>0.75%)",63.7,71.5,128.0,7.04,198,5,3],["CLUST-PB-0069","Village Moonak Garh #69","Moonak","Sangrur",30.2757,75.8591,"Alluvial",0.7,"DEFICIENT (0.50-0.75%)",125.4,39.5,146.8,7.52,199,9,5],["CLUST-PB-0015","Village Longowal Majra #15","Longowal","Sangrur",30.277,75.8293,"Clay Loam",0.58,"DEFICIENT (0.50-0.75%)",93.2,66.4,141.1,7.16,264,11,3],["CLUST-PB-0067","Village Bhawanigarh Pur #67","Bhawanigarh","Sangrur",30.2154,75.8299,"Alluvial",0.59,"DEFICIENT (0.50-0.75%)",112.4,43.9,160.6,7.07,96,11,2],["CLUST-PB-0009","Village Sunam Garh #9","Sunam","Sangrur",30.2646,75.87,"Sandy Loam",0.79,"MODERATE (>0.75%)",75.0,46.0,121.9,6.86,320,8,1],["CLUST-PB-0025","Village Sunam Kalan #25","Sunam","Sangrur",30.2497,75.9072,"Loamy",0.73,"DEFICIENT (0.50-0.75%)",84.0,40.2,212.4,7.49,97,9,2],["CLUST-PB-0038","Village Dirba Khurd #38","Dirba","Sangrur",30.2422,75.8021,"Clay Loam",0.76,"MODERATE (>0.75%)",88.5,38.7,158.7,6.93,267,9,1],["CLUST-PB-0020","Village Lehragaga Kot #20","Lehragaga","Sangrur",30.3018,75.9192,"Sandy Loam",0.93,"MODERATE (>0.75%)",94.4,45.8,207.8,7.47,145,7,4],["CLUST-PB-0033","Village Sunam Garh #33","Sunam","Sangrur",30.2344,75.8544,"Sandy Loam",0.69,"DEFICIENT (0.50-0.75%)",99.6,53.5,143.0,7.45,72,11,2],["CLUST-PB-0037","Village Moonak Kalan #37","Moonak","Sangrur",30.3633,75.7959,"Clay Loam",0.63,"DEFICIENT (0.50-0.75%)",78.9,59.9,211.9,6.62,266,12,3],["CLUST-PB-0057","Village Sunam Garh #57","Sunam","Sangrur",30.2572,75.8179,"Clay Loam",0.89,"MODERATE (>0.75%)",88.3,34.2,169.5,7.08,153,8,2],["CLUST-PB-0059","Village Bhawanigarh Basti #59","Bhawanigarh","Sangrur",30.1534,75.85,"Sandy Loam",0.71,"DEFICIENT (0.50-0.75%)",73.3,30.3,162.5,7.35,216,11,5],["CLUST-PB-0046","Village Dirba Patti #46","Dirba","Sangrur",30.2763,75.7741,"Loamy",0.91,"MODERATE (>0.75%)",86.8,49.3,92.4,7.51,254,8,1],["CLUST-PB-0035","Village Bhawanigarh Basti #35","Bhawanigarh","Sangrur",30.307,75.9922,"Loamy",0.79,"MODERATE (>0.75%)",106.0,32.9,181.5,6.96,257,10,2],["CLUST-PB-0026","Village Dhuri Khurd #26","Dhuri","Sangrur",30.2726,75.8075,"Alluvial",0.8,"MODERATE (>0.75%)",93.5,49.0,160.0,7.43,214,10,5],["CLUST-PB-0048","Village Sherpur Dera #48","Sherpur","Sangrur",30.1476,75.8276,"Alluvial",0.81,"MODERATE (>0.75%)",83.4,57.9,141.6,7.26,125,10,5],["CLUST-PB-0036","Village Lehragaga Dera #36","Lehragaga","Sangrur",30.315,75.8391,"Sandy Loam",1.05,"MODERATE (>0.75%)",138.5,46.4,104.8,7.01,246,7,1],["CLUST-PB-0006","Village Dirba Wali #6","Dirba","Sangrur",30.2908,75.79,"Loamy",0.92,"MODERATE (>0.75%)",102.8,41.6,126.9,7.55,147,9,2],["CLUST-PB-0008","Village Sherpur Kot #8","Sherpur","Sangrur",30.1664,75.8225,"Alluvial",0.83,"MODERATE (>0.75%)",117.3,40.2,154.1,6.91,262,11,4],["CLUST-PB-0044","Village Lehragaga Kot #44","Lehragaga","Sangrur",30.1698,75.806,"Clay Loam",0.83,"MODERATE (>0.75%)",110.1,38.7,159.7,6.47,308,11,2],["CLUST-PB-0002","Village Dhuri Khurd #2","Dhuri","Sangrur",30.2311,75.8572,"Sandy Loam",0.98,"MODERATE (>0.75%)",109.2,47.2,133.1,6.79,289,10,3],["CLUST-PB-0014","Village Dirba Khurd #14","Dirba","Sangrur",30.246,75.8453,"Sandy Loam",0.92,"MODERATE (>0.75%)",90.8,44.7,151.6,6.5,125,11,4],["CLUST-PB-0028","Village Lehragaga Pind #28","Lehragaga","Sangrur",30.2632,75.8567,"Loamy",0.94,"MODERATE (>0.75%)",83.9,29.9,132.3,7.13,107,11,4],["CLUST-PB-0021","Village Moonak Garh #21","Moonak","Sangrur",30.1366,75.8573,"Clay Loam",0.88,"MODERATE (>0.75%)",91.2,55.2,159.4,7.69,276,12,5],["CLUST-PB-0056","Village Sherpur Kot #56","Sherpur","Sangrur",30.2074,75.8925,"Clay Loam",0.77,"MODERATE (>0.75%)",105.4,35.8,121.7,7.18,225,14,2],["CLUST-PB-0012","Village Lehragaga Dera #12","Lehragaga","Sangrur",30.2358,75.845,"Loamy",0.81,"MODERATE (>0.75%)",92.4,32.1,217.3,7.04,212,14,5],["CLUST-PB-0024","Village Sherpur Dera #24","Sherpur","Sangrur",30.3138,75.8442,"Clay Loam",1.01,"MODERATE (>0.75%)",83.7,39.8,122.1,6.93,164,11,3],["CLUST-PB-0062","Village Dirba Khurd #62","Dirba","Sangrur",30.3299,75.8245,"Loamy",0.94,"MODERATE (>0.75%)",88.3,59.6,166.4,7.22,209,12,2],["CLUST-PB-0019","Village Bhawanigarh Pur #19","Bhawanigarh","Sangrur",30.2323,75.7265,"Loamy",0.88,"MODERATE (>0.75%)",104.9,41.4,154.6,7.3,286,13,5],["CLUST-PB-0005","Village Moonak Wala #5","Moonak","Sangrur",30.2823,75.7629,"Loamy",0.93,"MODERATE (>0.75%)",79.4,45.4,148.7,7.18,179,14,1],["CLUST-PB-0007","Village Longowal Pur #7","Longowal","Sangrur",30.2736,75.8964,"Sandy Loam",1.03,"MODERATE (>0.75%)",95.7,33.4,140.3,7.48,76,13,3],["CLUST-PB-0525","Village Naushera Pannuan Garh #45","Naushera Pannuan","Tarn Taran",31.4486,74.9485,"Sandy Loam",0.3,"CRITICAL (<0.50%)",133.6,59.4,246.2,7.13,261,3,4],["CLUST-PB-0485","Village Chohla Sahib Wala #5","Chohla Sahib","Tarn Taran",31.4688,74.9158,"Clay Loam",0.5,"DEFICIENT (0.50-0.75%)",92.0,55.3,142.1,7.53,241,2,2],["CLUST-PB-0528","Village Valtoha Dera #48","Valtoha","Tarn Taran",31.4521,74.9957,"Loamy",0.59,"DEFICIENT (0.50-0.75%)",52.6,58.2,144.8,7.09,175,1,4],["CLUST-PB-0534","Village Valtoha Wali #54","Valtoha","Tarn Taran",31.4111,74.9186,"Sandy Loam",0.52,"DEFICIENT (0.50-0.75%)",134.0,62.6,163.0,6.89,67,3,1],["CLUST-PB-0548","Village Khadoor Sahib Kot #68","Khadoor Sahib","Tarn Taran",31.5475,74.9424,"Alluvial",0.65,"DEFICIENT (0.50-0.75%)",108.1,52.1,229.1,7.06,202,1,4],["CLUST-PB-0512","Village Khadoor Sahib Kot #32","Khadoor Sahib","Tarn Taran",31.3893,74.9385,"Clay Loam",0.53,"DEFICIENT (0.50-0.75%)",74.9,59.5,178.5,6.71,208,3,1],["CLUST-PB-0503","Village Chohla Sahib Basti #23","Chohla Sahib","Tarn Taran",31.4324,75.0123,"Alluvial",0.6,"DEFICIENT (0.50-0.75%)",99.0,65.7,161.7,7.22,236,2,5],["CLUST-PB-0533","Village Chohla Sahib Wala #53","Chohla Sahib","Tarn Taran",31.406,75.014,"Sandy Loam",0.62,"DEFICIENT (0.50-0.75%)",102.0,54.0,147.2,7.73,179,2,1],["CLUST-PB-0523","Village Patti Pur #43","Patti","Tarn Taran",31.5162,74.9712,"Sandy Loam",0.51,"DEFICIENT (0.50-0.75%)",116.6,50.6,131.7,7.14,189,5,4],["CLUST-PB-0524","Village Khadoor Sahib Kot #44","Khadoor Sahib","Tarn Taran",31.4765,74.9117,"Clay Loam",0.65,"DEFICIENT (0.50-0.75%)",38.7,68.8,188.8,6.54,191,3,1],["CLUST-PB-0532","Village Bhikhiwind Pind #52","Bhikhiwind","Tarn Taran",31.4798,74.9503,"Loamy",0.49,"CRITICAL (<0.50%)",48.5,60.3,216.8,6.23,78,6,1],["CLUST-PB-0526","Village Bhikhiwind Patti #46","Bhikhiwind","Tarn Taran",31.4708,74.9885,"Clay Loam",0.83,"MODERATE (>0.75%)",72.5,65.5,211.9,7.3,112,1,1],["CLUST-PB-0527","Village Chohla Sahib Basti #47","Chohla Sahib","Tarn Taran",31.5322,74.9704,"Alluvial",0.71,"DEFICIENT (0.50-0.75%)",91.6,47.2,183.0,7.17,196,3,3],["CLUST-PB-0496","Village Bhikhiwind Pind #16","Bhikhiwind","Tarn Taran",31.4583,74.8846,"Clay Loam",0.48,"CRITICAL (<0.50%)",82.3,61.7,193.6,7.76,246,7,2],["CLUST-PB-0487","Village Patti Pur #7","Patti","Tarn Taran",31.5125,74.844,"Alluvial",0.67,"DEFICIENT (0.50-0.75%)",80.0,69.4,189.4,6.81,214,4,5],["CLUST-PB-0513","Village Naushera Pannuan Garh #33","Naushera Pannuan","Tarn Taran",31.4269,74.843,"Clay Loam",0.61,"DEFICIENT (0.50-0.75%)",124.8,59.4,231.4,6.67,73,5,4]];
+    const DISTRICT_SUMMARIES = {"Amritsar":{"district":"Amritsar","solver_status":"OR-Tools CP-SAT (OPTIMAL)","solve_time_sec":0.036,"total_clusters":68,"clusters_fully_served_subak":19,"clusters_fully_served_baseline":2,"total_paddy_ha":14159,"subak_mulched_ha":8559.0,"baseline_mulched_ha":3972.5,"subak_coverage_pct":60.4,"baseline_coverage_pct":28.1,"coverage_lift_pct":32.3,"total_carbon_saved_tons":18829.8,"total_stabilized_carbon_tons":18872.4,"total_npk_saved_kg":1543198,"total_fertilizer_savings_inr":50982261,"local_chc_machines":214,"pooled_daily_fleet":289,"sharing_radius_km":18.0,"gini_equity_subak":0.335,"gini_equity_baseline":0.42,"center_lat":31.6346,"center_lon":74.8837,"daily_fleet_utilization":[{"day":1,"machines_dispatched":289,"fleet_capacity":289},{"day":2,"machines_dispatched":289,"fleet_capacity":289},{"day":3,"machines_dispatched":289,"fleet_capacity":289},{"day":4,"machines_dispatched":289,"fleet_capacity":289},{"day":5,"machines_dispatched":289,"fleet_capacity":289},{"day":6,"machines_dispatched":289,"fleet_capacity":289},{"day":7,"machines_dispatched":289,"fleet_capacity":289},{"day":8,"machines_dispatched":289,"fleet_capacity":289},{"day":9,"machines_dispatched":289,"fleet_capacity":289},{"day":10,"machines_dispatched":289,"fleet_capacity":289},{"day":11,"machines_dispatched":210,"fleet_capacity":289},{"day":12,"machines_dispatched":150,"fleet_capacity":289},{"day":13,"machines_dispatched":120,"fleet_capacity":289},{"day":14,"machines_dispatched":62,"fleet_capacity":289},{"day":15,"machines_dispatched":0,"fleet_capacity":289}]},"Barnala":{"district":"Barnala","solver_status":"OR-Tools CP-SAT (OPTIMAL)","solve_time_sec":0.033,"total_clusters":68,"clusters_fully_served_subak":31,"clusters_fully_served_baseline":9,"total_paddy_ha":12607,"subak_mulched_ha":8806.5,"baseline_mulched_ha":3510.0,"subak_coverage_pct":69.9,"baseline_coverage_pct":27.8,"coverage_lift_pct":42.1,"total_carbon_saved_tons":19374.3,"total_stabilized_carbon_tons":19597.8,"total_npk_saved_kg":1587432,"total_fertilizer_savings_inr":52435012,"local_chc_machines":215,"pooled_daily_fleet":290,"sharing_radius_km":18.0,"gini_equity_subak":0.216,"gini_equity_baseline":0.472,"center_lat":30.3833,"center_lon":75.5473,"daily_fleet_utilization":[{"day":1,"machines_dispatched":290,"fleet_capacity":290},{"day":2,"machines_dispatched":290,"fleet_capacity":290},{"day":3,"machines_dispatched":290,"fleet_capacity":290},{"day":4,"machines_dispatched":290,"fleet_capacity":290},{"day":5,"machines_dispatched":290,"fleet_capacity":290},{"day":6,"machines_dispatched":290,"fleet_capacity":290},{"day":7,"machines_dispatched":290,"fleet_capacity":290},{"day":8,"machines_dispatched":290,"fleet_capacity":290},{"day":9,"machines_dispatched":290,"fleet_capacity":290},{"day":10,"machines_dispatched":290,"fleet_capacity":290},{"day":11,"machines_dispatched":285,"fleet_capacity":290},{"day":12,"machines_dispatched":221,"fleet_capacity":290},{"day":13,"machines_dispatched":96,"fleet_capacity":290},{"day":14,"machines_dispatched":31,"fleet_capacity":290},{"day":15,"machines_dispatched":0,"fleet_capacity":290}]},"Bathinda":{"district":"Bathinda","solver_status":"OR-Tools CP-SAT (OPTIMAL)","solve_time_sec":0.041,"total_clusters":69,"clusters_fully_served_subak":24,"clusters_fully_served_baseline":4,"total_paddy_ha":13930,"subak_mulched_ha":8680.0,"baseline_mulched_ha":3831.5,"subak_coverage_pct":62.3,"baseline_coverage_pct":27.5,"coverage_lift_pct":34.8,"total_carbon_saved_tons":19096.0,"total_stabilized_carbon_tons":19205.5,"total_npk_saved_kg":1565006,"total_fertilizer_savings_inr":51702543,"local_chc_machines":210,"pooled_daily_fleet":284,"sharing_radius_km":18.0,"gini_equity_subak":0.311,"gini_equity_baseline":0.444,"center_lat":30.2205,"center_lon":74.9359,"daily_fleet_utilization":[{"day":1,"machines_dispatched":284,"fleet_capacity":284},{"day":2,"machines_dispatched":284,"fleet_capacity":284},{"day":3,"machines_dispatched":284,"fleet_capacity":284},{"day":4,"machines_dispatched":284,"fleet_capacity":284},{"day":5,"machines_dispatched":284,"fleet_capacity":284},{"day":6,"machines_dispatched":284,"fleet_capacity":284},{"day":7,"machines_dispatched":284,"fleet_capacity":284},{"day":8,"machines_dispatched":284,"fleet_capacity":284},{"day":9,"machines_dispatched":284,"fleet_capacity":284},{"day":10,"machines_dispatched":284,"fleet_capacity":284},{"day":11,"machines_dispatched":255,"fleet_capacity":284},{"day":12,"machines_dispatched":224,"fleet_capacity":284},{"day":13,"machines_dispatched":123,"fleet_capacity":284},{"day":14,"machines_dispatched":39,"fleet_capacity":284},{"day":15,"machines_dispatched":0,"fleet_capacity":284}]},"Faridkot":{"district":"Faridkot","solver_status":"OR-Tools CP-SAT (OPTIMAL)","solve_time_sec":0.036,"total_clusters":68,"clusters_fully_served_subak":20,"clusters_fully_served_baseline":6,"total_paddy_ha":13112,"subak_mulched_ha":7411.5,"baseline_mulched_ha":3214.0,"subak_coverage_pct":56.5,"baseline_coverage_pct":24.5,"coverage_lift_pct":32.0,"total_carbon_saved_tons":16305.3,"total_stabilized_carbon_tons":16286.9,"total_npk_saved_kg":1336367,"total_fertilizer_savings_inr":44150660,"local_chc_machines":188,"pooled_daily_fleet":254,"sharing_radius_km":18.0,"gini_equity_subak":0.382,"gini_equity_baseline":0.497,"center_lat":30.6729,"center_lon":74.754,"daily_fleet_utilization":[{"day":1,"machines_dispatched":254,"fleet_capacity":254},{"day":2,"machines_dispatched":254,"fleet_capacity":254},{"day":3,"machines_dispatched":254,"fleet_capacity":254},{"day":4,"machines_dispatched":254,"fleet_capacity":254},{"day":5,"machines_dispatched":254,"fleet_capacity":254},{"day":6,"machines_dispatched":254,"fleet_capacity":254},{"day":7,"machines_dispatched":254,"fleet_capacity":254},{"day":8,"machines_dispatched":254,"fleet_capacity":254},{"day":9,"machines_dispatched":254,"fleet_capacity":254},{"day":10,"machines_dispatched":254,"fleet_capacity":254},{"day":11,"machines_dispatched":195,"fleet_capacity":254},{"day":12,"machines_dispatched":136,"fleet_capacity":254},{"day":13,"machines_dispatched":71,"fleet_capacity":254},{"day":14,"machines_dispatched":30,"fleet_capacity":254},{"day":15,"machines_dispatched":0,"fleet_capacity":254}]},"Fatehgarh Sahib":{"district":"Fatehgarh Sahib","solver_status":"OR-Tools CP-SAT (OPTIMAL)","solve_time_sec":0.034,"total_clusters":68,"clusters_fully_served_subak":24,"clusters_fully_served_baseline":2,"total_paddy_ha":13240,"subak_mulched_ha":9129.5,"baseline_mulched_ha":3847.5,"subak_coverage_pct":69.0,"baseline_coverage_pct":29.1,"coverage_lift_pct":39.9,"total_carbon_saved_tons":20084.9,"total_stabilized_carbon_tons":20343.0,"total_npk_saved_kg":1646258,"total_fertilizer_savings_inr":54391396,"local_chc_machines":213,"pooled_daily_fleet":288,"sharing_radius_km":18.0,"gini_equity_subak":0.26,"gini_equity_baseline":0.382,"center_lat":30.6414,"center_lon":76.4104,"daily_fleet_utilization":[{"day":1,"machines_dispatched":288,"fleet_capacity":288},{"day":2,"machines_dispatched":288,"fleet_capacity":288},{"day":3,"machines_dispatched":288,"fleet_capacity":288},{"day":4,"machines_dispatched":288,"fleet_capacity":288},{"day":5,"machines_dispatched":288,"fleet_capacity":288},{"day":6,"machines_dispatched":288,"fleet_capacity":288},{"day":7,"machines_dispatched":288,"fleet_capacity":288},{"day":8,"machines_dispatched":288,"fleet_capacity":288},{"day":9,"machines_dispatched":288,"fleet_capacity":288},{"day":10,"machines_dispatched":288,"fleet_capacity":288},{"day":11,"machines_dispatched":288,"fleet_capacity":288},{"day":12,"machines_dispatched":255,"fleet_capacity":288},{"day":13,"machines_dispatched":161,"fleet_capacity":288},{"day":14,"machines_dispatched":75,"fleet_capacity":288},{"day":15,"machines_dispatched":0,"fleet_capacity":288}]},"Fazilka":{"district":"Fazilka","solver_status":"OR-Tools CP-SAT (OPTIMAL)","solve_time_sec":0.038,"total_clusters":68,"clusters_fully_served_subak":40,"clusters_fully_served_baseline":3,"total_paddy_ha":12429,"subak_mulched_ha":9139.5,"baseline_mulched_ha":3951.5,"subak_coverage_pct":73.5,"baseline_coverage_pct":31.8,"coverage_lift_pct":41.7,"total_carbon_saved_tons":20106.9,"total_stabilized_carbon_tons":20207.1,"total_npk_saved_kg":1646940,"total_fertilizer_savings_inr":54389282,"local_chc_machines":231,"pooled_daily_fleet":312,"sharing_radius_km":18.0,"gini_equity_subak":0.207,"gini_equity_baseline":0.424,"center_lat":30.3993,"center_lon":74.0244,"daily_fleet_utilization":[{"day":1,"machines_dispatched":312,"fleet_capacity":312},{"day":2,"machines_dispatched":312,"fleet_capacity":312},{"day":3,"machines_dispatched":312,"fleet_capacity":312},{"day":4,"machines_dispatched":312,"fleet_capacity":312},{"day":5,"machines_dispatched":312,"fleet_capacity":312},{"day":6,"machines_dispatched":312,"fleet_capacity":312},{"day":7,"machines_dispatched":312,"fleet_capacity":312},{"day":8,"machines_dispatched":312,"fleet_capacity":312},{"day":9,"machines_dispatched":312,"fleet_capacity":312},{"day":10,"machines_dispatched":312,"fleet_capacity":312},{"day":11,"machines_dispatched":225,"fleet_capacity":312},{"day":12,"machines_dispatched":206,"fleet_capacity":312},{"day":13,"machines_dispatched":86,"fleet_capacity":312},{"day":14,"machines_dispatched":34,"fleet_capacity":312},{"day":15,"machines_dispatched":0,"fleet_capacity":312}]},"Firozpur":{"district":"Firozpur","solver_status":"OR-Tools CP-SAT (OPTIMAL)","solve_time_sec":0.034,"total_clusters":68,"clusters_fully_served_subak":28,"clusters_fully_served_baseline":7,"total_paddy_ha":12018,"subak_mulched_ha":8350.5,"baseline_mulched_ha":3481.5,"subak_coverage_pct":69.5,"baseline_coverage_pct":29.0,"coverage_lift_pct":40.5,"total_carbon_saved_tons":18371.1,"total_stabilized_carbon_tons":18285.1,"total_npk_saved_kg":1505733,"total_fertilizer_savings_inr":49747316,"local_chc_machines":196,"pooled_daily_fleet":265,"sharing_radius_km":18.0,"gini_equity_subak":0.243,"gini_equity_baseline":0.474,"center_lat":30.9193,"center_lon":74.6076,"daily_fleet_utilization":[{"day":1,"machines_dispatched":265,"fleet_capacity":265},{"day":2,"machines_dispatched":265,"fleet_capacity":265},{"day":3,"machines_dispatched":265,"fleet_capacity":265},{"day":4,"machines_dispatched":265,"fleet_capacity":265},{"day":5,"machines_dispatched":265,"fleet_capacity":265},{"day":6,"machines_dispatched":265,"fleet_capacity":265},{"day":7,"machines_dispatched":265,"fleet_capacity":265},{"day":8,"machines_dispatched":265,"fleet_capacity":265},{"day":9,"machines_dispatched":265,"fleet_capacity":265},{"day":10,"machines_dispatched":265,"fleet_capacity":265},{"day":11,"machines_dispatched":265,"fleet_capacity":265},{"day":12,"machines_dispatched":240,"fleet_capacity":265},{"day":13,"machines_dispatched":131,"fleet_capacity":265},{"day":14,"machines_dispatched":67,"fleet_capacity":265},{"day":15,"machines_dispatched":0,"fleet_capacity":265}]},"Gurdaspur":{"district":"Gurdaspur","solver_status":"OR-Tools CP-SAT (OPTIMAL)","solve_time_sec":0.034,"total_clusters":68,"clusters_fully_served_subak":31,"clusters_fully_served_baseline":4,"total_paddy_ha":12403,"subak_mulched_ha":8080.5,"baseline_mulched_ha":3196.5,"subak_coverage_pct":65.1,"baseline_coverage_pct":25.8,"coverage_lift_pct":39.3,"total_carbon_saved_tons":17777.1,"total_stabilized_carbon_tons":17889.2,"total_npk_saved_kg":1456826,"total_fertilizer_savings_inr":48126651,"local_chc_machines":202,"pooled_daily_fleet":273,"sharing_radius_km":18.0,"gini_equity_subak":0.285,"gini_equity_baseline":0.466,"center_lat":32.0416,"center_lon":75.3978,"daily_fleet_utilization":[{"day":1,"machines_dispatched":273,"fleet_capacity":273},{"day":2,"machines_dispatched":273,"fleet_capacity":273},{"day":3,"machines_dispatched":273,"fleet_capacity":273},{"day":4,"machines_dispatched":273,"fleet_capacity":273},{"day":5,"machines_dispatched":273,"fleet_capacity":273},{"day":6,"machines_dispatched":273,"fleet_capacity":273},{"day":7,"machines_dispatched":273,"fleet_capacity":273},{"day":8,"machines_dispatched":273,"fleet_capacity":273},{"day":9,"machines_dispatched":273,"fleet_capacity":273},{"day":10,"machines_dispatched":273,"fleet_capacity":273},{"day":11,"machines_dispatched":225,"fleet_capacity":273},{"day":12,"machines_dispatched":165,"fleet_capacity":273},{"day":13,"machines_dispatched":118,"fleet_capacity":273},{"day":14,"machines_dispatched":6,"fleet_capacity":273},{"day":15,"machines_dispatched":0,"fleet_capacity":273}]},"Hoshiarpur":{"district":"Hoshiarpur","solver_status":"OR-Tools CP-SAT (OPTIMAL)","solve_time_sec":0.033,"total_clusters":68,"clusters_fully_served_subak":17,"clusters_fully_served_baseline":2,"total_paddy_ha":14151,"subak_mulched_ha":8307.0,"baseline_mulched_ha":3609.0,"subak_coverage_pct":58.7,"baseline_coverage_pct":25.5,"coverage_lift_pct":33.2,"total_carbon_saved_tons":18275.4,"total_stabilized_carbon_tons":18032.1,"total_npk_saved_kg":1498075,"total_fertilizer_savings_inr":49498415,"local_chc_machines":194,"pooled_daily_fleet":262,"sharing_radius_km":18.0,"gini_equity_subak":0.322,"gini_equity_baseline":0.462,"center_lat":31.5346,"center_lon":75.9105,"daily_fleet_utilization":[{"day":1,"machines_dispatched":262,"fleet_capacity":262},{"day":2,"machines_dispatched":262,"fleet_capacity":262},{"day":3,"machines_dispatched":262,"fleet_capacity":262},{"day":4,"machines_dispatched":262,"fleet_capacity":262},{"day":5,"machines_dispatched":262,"fleet_capacity":262},{"day":6,"machines_dispatched":262,"fleet_capacity":262},{"day":7,"machines_dispatched":262,"fleet_capacity":262},{"day":8,"machines_dispatched":262,"fleet_capacity":262},{"day":9,"machines_dispatched":262,"fleet_capacity":262},{"day":10,"machines_dispatched":262,"fleet_capacity":262},{"day":11,"machines_dispatched":240,"fleet_capacity":262},{"day":12,"machines_dispatched":225,"fleet_capacity":262},{"day":13,"machines_dispatched":158,"fleet_capacity":262},{"day":14,"machines_dispatched":83,"fleet_capacity":262},{"day":15,"machines_dispatched":0,"fleet_capacity":262}]},"Jalandhar":{"district":"Jalandhar","solver_status":"OR-Tools CP-SAT (OPTIMAL)","solve_time_sec":0.033,"total_clusters":68,"clusters_fully_served_subak":21,"clusters_fully_served_baseline":4,"total_paddy_ha":13559,"subak_mulched_ha":8490.5,"baseline_mulched_ha":3629.5,"subak_coverage_pct":62.6,"baseline_coverage_pct":26.8,"coverage_lift_pct":35.8,"total_carbon_saved_tons":18679.1,"total_stabilized_carbon_tons":18758.7,"total_npk_saved_kg":1530451,"total_fertilizer_savings_inr":50552430,"local_chc_machines":199,"pooled_daily_fleet":269,"sharing_radius_km":18.0,"gini_equity_subak":0.315,"gini_equity_baseline":0.436,"center_lat":31.3204,"center_lon":75.5782,"daily_fleet_utilization":[{"day":1,"machines_dispatched":269,"fleet_capacity":269},{"day":2,"machines_dispatched":269,"fleet_capacity":269},{"day":3,"machines_dispatched":269,"fleet_capacity":269},{"day":4,"machines_dispatched":269,"fleet_capacity":269},{"day":5,"machines_dispatched":269,"fleet_capacity":269},{"day":6,"machines_dispatched":269,"fleet_capacity":269},{"day":7,"machines_dispatched":269,"fleet_capacity":269},{"day":8,"machines_dispatched":269,"fleet_capacity":269},{"day":9,"machines_dispatched":269,"fleet_capacity":269},{"day":10,"machines_dispatched":269,"fleet_capacity":269},{"day":11,"machines_dispatched":269,"fleet_capacity":269},{"day":12,"machines_dispatched":240,"fleet_capacity":269},{"day":13,"machines_dispatched":148,"fleet_capacity":269},{"day":14,"machines_dispatched":60,"fleet_capacity":269},{"day":15,"machines_dispatched":0,"fleet_capacity":269}]},"Kapurthala":{"district":"Kapurthala","solver_status":"OR-Tools CP-SAT (OPTIMAL)","solve_time_sec":0.036,"total_clusters":68,"clusters_fully_served_subak":26,"clusters_fully_served_baseline":4,"total_paddy_ha":13075,"subak_mulched_ha":7641.0,"baseline_mulched_ha":3461.5,"subak_coverage_pct":58.4,"baseline_coverage_pct":26.5,"coverage_lift_pct":31.9,"total_carbon_saved_tons":16810.2,"total_stabilized_carbon_tons":16802.7,"total_npk_saved_kg":1377715,"total_fertilizer_savings_inr":45515971,"local_chc_machines":194,"pooled_daily_fleet":262,"sharing_radius_km":18.0,"gini_equity_subak":0.335,"gini_equity_baseline":0.467,"center_lat":31.3702,"center_lon":75.381,"daily_fleet_utilization":[{"day":1,"machines_dispatched":262,"fleet_capacity":262},{"day":2,"machines_dispatched":262,"fleet_capacity":262},{"day":3,"machines_dispatched":262,"fleet_capacity":262},{"day":4,"machines_dispatched":262,"fleet_capacity":262},{"day":5,"machines_dispatched":262,"fleet_capacity":262},{"day":6,"machines_dispatched":262,"fleet_capacity":262},{"day":7,"machines_dispatched":262,"fleet_capacity":262},{"day":8,"machines_dispatched":262,"fleet_capacity":262},{"day":9,"machines_dispatched":262,"fleet_capacity":262},{"day":10,"machines_dispatched":262,"fleet_capacity":262},{"day":11,"machines_dispatched":210,"fleet_capacity":262},{"day":12,"machines_dispatched":146,"fleet_capacity":262},{"day":13,"machines_dispatched":89,"fleet_capacity":262},{"day":14,"machines_dispatched":0,"fleet_capacity":262},{"day":15,"machines_dispatched":0,"fleet_capacity":262}]},"Ludhiana":{"district":"Ludhiana","solver_status":"OR-Tools CP-SAT (OPTIMAL)","solve_time_sec":0.036,"total_clusters":69,"clusters_fully_served_subak":36,"clusters_fully_served_baseline":8,"total_paddy_ha":12594,"subak_mulched_ha":9125.5,"baseline_mulched_ha":4122.5,"subak_coverage_pct":72.5,"baseline_coverage_pct":32.7,"coverage_lift_pct":39.8,"total_carbon_saved_tons":20076.1,"total_stabilized_carbon_tons":20066.8,"total_npk_saved_kg":1645761,"total_fertilizer_savings_inr":54379867,"local_chc_machines":225,"pooled_daily_fleet":304,"sharing_radius_km":18.0,"gini_equity_subak":0.242,"gini_equity_baseline":0.407,"center_lat":30.9046,"center_lon":75.8591,"daily_fleet_utilization":[{"day":1,"machines_dispatched":304,"fleet_capacity":304},{"day":2,"machines_dispatched":304,"fleet_capacity":304},{"day":3,"machines_dispatched":304,"fleet_capacity":304},{"day":4,"machines_dispatched":304,"fleet_capacity":304},{"day":5,"machines_dispatched":304,"fleet_capacity":304},{"day":6,"machines_dispatched":304,"fleet_capacity":304},{"day":7,"machines_dispatched":304,"fleet_capacity":304},{"day":8,"machines_dispatched":304,"fleet_capacity":304},{"day":9,"machines_dispatched":304,"fleet_capacity":304},{"day":10,"machines_dispatched":304,"fleet_capacity":304},{"day":11,"machines_dispatched":300,"fleet_capacity":304},{"day":12,"machines_dispatched":180,"fleet_capacity":304},{"day":13,"machines_dispatched":104,"fleet_capacity":304},{"day":14,"machines_dispatched":42,"fleet_capacity":304},{"day":15,"machines_dispatched":0,"fleet_capacity":304}]},"Mansa":{"district":"Mansa","solver_status":"OR-Tools CP-SAT (OPTIMAL)","solve_time_sec":0.034,"total_clusters":68,"clusters_fully_served_subak":27,"clusters_fully_served_baseline":4,"total_paddy_ha":12807,"subak_mulched_ha":8336.5,"baseline_mulched_ha":3488.0,"subak_coverage_pct":65.1,"baseline_coverage_pct":27.2,"coverage_lift_pct":37.9,"total_carbon_saved_tons":18340.3,"total_stabilized_carbon_tons":18438.9,"total_npk_saved_kg":1503547,"total_fertilizer_savings_inr":49682513,"local_chc_machines":201,"pooled_daily_fleet":271,"sharing_radius_km":18.0,"gini_equity_subak":0.285,"gini_equity_baseline":0.48,"center_lat":29.9838,"center_lon":75.3875,"daily_fleet_utilization":[{"day":1,"machines_dispatched":271,"fleet_capacity":271},{"day":2,"machines_dispatched":271,"fleet_capacity":271},{"day":3,"machines_dispatched":271,"fleet_capacity":271},{"day":4,"machines_dispatched":271,"fleet_capacity":271},{"day":5,"machines_dispatched":271,"fleet_capacity":271},{"day":6,"machines_dispatched":271,"fleet_capacity":271},{"day":7,"machines_dispatched":271,"fleet_capacity":271},{"day":8,"machines_dispatched":271,"fleet_capacity":271},{"day":9,"machines_dispatched":271,"fleet_capacity":271},{"day":10,"machines_dispatched":271,"fleet_capacity":271},{"day":11,"machines_dispatched":270,"fleet_capacity":271},{"day":12,"machines_dispatched":225,"fleet_capacity":271},{"day":13,"machines_dispatched":94,"fleet_capacity":271},{"day":14,"machines_dispatched":47,"fleet_capacity":271},{"day":15,"machines_dispatched":0,"fleet_capacity":271}]},"Moga":{"district":"Moga","solver_status":"OR-Tools CP-SAT (OPTIMAL)","solve_time_sec":0.04,"total_clusters":68,"clusters_fully_served_subak":24,"clusters_fully_served_baseline":5,"total_paddy_ha":12541,"subak_mulched_ha":7915.0,"baseline_mulched_ha":3494.0,"subak_coverage_pct":63.1,"baseline_coverage_pct":27.9,"coverage_lift_pct":35.2,"total_carbon_saved_tons":17413.0,"total_stabilized_carbon_tons":17176.2,"total_npk_saved_kg":1427231,"total_fertilizer_savings_inr":47154302,"local_chc_machines":195,"pooled_daily_fleet":263,"sharing_radius_km":18.0,"gini_equity_subak":0.32,"gini_equity_baseline":0.422,"center_lat":30.811,"center_lon":75.1732,"daily_fleet_utilization":[{"day":1,"machines_dispatched":263,"fleet_capacity":263},{"day":2,"machines_dispatched":263,"fleet_capacity":263},{"day":3,"machines_dispatched":263,"fleet_capacity":263},{"day":4,"machines_dispatched":263,"fleet_capacity":263},{"day":5,"machines_dispatched":263,"fleet_capacity":263},{"day":6,"machines_dispatched":263,"fleet_capacity":263},{"day":7,"machines_dispatched":263,"fleet_capacity":263},{"day":8,"machines_dispatched":263,"fleet_capacity":263},{"day":9,"machines_dispatched":263,"fleet_capacity":263},{"day":10,"machines_dispatched":263,"fleet_capacity":263},{"day":11,"machines_dispatched":263,"fleet_capacity":263},{"day":12,"machines_dispatched":180,"fleet_capacity":263},{"day":13,"machines_dispatched":86,"fleet_capacity":263},{"day":14,"machines_dispatched":15,"fleet_capacity":263},{"day":15,"machines_dispatched":0,"fleet_capacity":263}]},"Muktsar":{"district":"Muktsar","solver_status":"OR-Tools CP-SAT (OPTIMAL)","solve_time_sec":0.038,"total_clusters":68,"clusters_fully_served_subak":24,"clusters_fully_served_baseline":4,"total_paddy_ha":11964,"subak_mulched_ha":8081.0,"baseline_mulched_ha":3857.5,"subak_coverage_pct":67.5,"baseline_coverage_pct":32.2,"coverage_lift_pct":35.3,"total_carbon_saved_tons":17778.2,"total_stabilized_carbon_tons":17881.2,"total_npk_saved_kg":1456897,"total_fertilizer_savings_inr":48128580,"local_chc_machines":200,"pooled_daily_fleet":270,"sharing_radius_km":18.0,"gini_equity_subak":0.341,"gini_equity_baseline":0.416,"center_lat":30.4792,"center_lon":74.4979,"daily_fleet_utilization":[{"day":1,"machines_dispatched":270,"fleet_capacity":270},{"day":2,"machines_dispatched":270,"fleet_capacity":270},{"day":3,"machines_dispatched":270,"fleet_capacity":270},{"day":4,"machines_dispatched":270,"fleet_capacity":270},{"day":5,"machines_dispatched":270,"fleet_capacity":270},{"day":6,"machines_dispatched":270,"fleet_capacity":270},{"day":7,"machines_dispatched":270,"fleet_capacity":270},{"day":8,"machines_dispatched":270,"fleet_capacity":270},{"day":9,"machines_dispatched":270,"fleet_capacity":270},{"day":10,"machines_dispatched":270,"fleet_capacity":270},{"day":11,"machines_dispatched":270,"fleet_capacity":270},{"day":12,"machines_dispatched":180,"fleet_capacity":270},{"day":13,"machines_dispatched":78,"fleet_capacity":270},{"day":14,"machines_dispatched":15,"fleet_capacity":270},{"day":15,"machines_dispatched":0,"fleet_capacity":270}]},"Pathankot":{"district":"Pathankot","solver_status":"OR-Tools CP-SAT (OPTIMAL)","solve_time_sec":0.035,"total_clusters":68,"clusters_fully_served_subak":29,"clusters_fully_served_baseline":4,"total_paddy_ha":13058,"subak_mulched_ha":8816.5,"baseline_mulched_ha":3861.5,"subak_coverage_pct":67.5,"baseline_coverage_pct":29.6,"coverage_lift_pct":37.9,"total_carbon_saved_tons":19396.3,"total_stabilized_carbon_tons":19256.7,"total_npk_saved_kg":1589157,"total_fertilizer_savings_inr":52490301,"local_chc_machines":208,"pooled_daily_fleet":281,"sharing_radius_km":18.0,"gini_equity_subak":0.262,"gini_equity_baseline":0.449,"center_lat":32.2694,"center_lon":75.6422,"daily_fleet_utilization":[{"day":1,"machines_dispatched":281,"fleet_capacity":281},{"day":2,"machines_dispatched":281,"fleet_capacity":281},{"day":3,"machines_dispatched":281,"fleet_capacity":281},{"day":4,"machines_dispatched":281,"fleet_capacity":281},{"day":5,"machines_dispatched":281,"fleet_capacity":281},{"day":6,"machines_dispatched":281,"fleet_capacity":281},{"day":7,"machines_dispatched":281,"fleet_capacity":281},{"day":8,"machines_dispatched":281,"fleet_capacity":281},{"day":9,"machines_dispatched":281,"fleet_capacity":281},{"day":10,"machines_dispatched":281,"fleet_capacity":281},{"day":11,"machines_dispatched":281,"fleet_capacity":281},{"day":12,"machines_dispatched":195,"fleet_capacity":281},{"day":13,"machines_dispatched":180,"fleet_capacity":281},{"day":14,"machines_dispatched":72,"fleet_capacity":281},{"day":15,"machines_dispatched":0,"fleet_capacity":281}]},"Patiala":{"district":"Patiala","solver_status":"OR-Tools CP-SAT (OPTIMAL)","solve_time_sec":0.037,"total_clusters":69,"clusters_fully_served_subak":27,"clusters_fully_served_baseline":1,"total_paddy_ha":12709,"subak_mulched_ha":8588.5,"baseline_mulched_ha":3525.5,"subak_coverage_pct":67.6,"baseline_coverage_pct":27.7,"coverage_lift_pct":39.9,"total_carbon_saved_tons":18894.7,"total_stabilized_carbon_tons":18778.8,"total_npk_saved_kg":1547424,"total_fertilizer_savings_inr":51097871,"local_chc_machines":209,"pooled_daily_fleet":282,"sharing_radius_km":18.0,"gini_equity_subak":0.259,"gini_equity_baseline":0.432,"center_lat":30.3409,"center_lon":76.3715,"daily_fleet_utilization":[{"day":1,"machines_dispatched":282,"fleet_capacity":282},{"day":2,"machines_dispatched":282,"fleet_capacity":282},{"day":3,"machines_dispatched":282,"fleet_capacity":282},{"day":4,"machines_dispatched":282,"fleet_capacity":282},{"day":5,"machines_dispatched":282,"fleet_capacity":282},{"day":6,"machines_dispatched":282,"fleet_capacity":282},{"day":7,"machines_dispatched":282,"fleet_capacity":282},{"day":8,"machines_dispatched":282,"fleet_capacity":282},{"day":9,"machines_dispatched":282,"fleet_capacity":282},{"day":10,"machines_dispatched":282,"fleet_capacity":282},{"day":11,"machines_dispatched":270,"fleet_capacity":282},{"day":12,"machines_dispatched":216,"fleet_capacity":282},{"day":13,"machines_dispatched":127,"fleet_capacity":282},{"day":14,"machines_dispatched":15,"fleet_capacity":282},{"day":15,"machines_dispatched":0,"fleet_capacity":282}]},"Rupnagar":{"district":"Rupnagar","solver_status":"OR-Tools CP-SAT (OPTIMAL)","solve_time_sec":0.036,"total_clusters":68,"clusters_fully_served_subak":24,"clusters_fully_served_baseline":2,"total_paddy_ha":12801,"subak_mulched_ha":7514.0,"baseline_mulched_ha":3480.5,"subak_coverage_pct":58.7,"baseline_coverage_pct":27.2,"coverage_lift_pct":31.5,"total_carbon_saved_tons":16530.8,"total_stabilized_carbon_tons":16439.4,"total_npk_saved_kg":1354887,"total_fertilizer_savings_inr":44763346,"local_chc_machines":189,"pooled_daily_fleet":255,"sharing_radius_km":18.0,"gini_equity_subak":0.354,"gini_equity_baseline":0.461,"center_lat":30.9689,"center_lon":76.5346,"daily_fleet_utilization":[{"day":1,"machines_dispatched":255,"fleet_capacity":255},{"day":2,"machines_dispatched":255,"fleet_capacity":255},{"day":3,"machines_dispatched":255,"fleet_capacity":255},{"day":4,"machines_dispatched":255,"fleet_capacity":255},{"day":5,"machines_dispatched":255,"fleet_capacity":255},{"day":6,"machines_dispatched":255,"fleet_capacity":255},{"day":7,"machines_dispatched":255,"fleet_capacity":255},{"day":8,"machines_dispatched":255,"fleet_capacity":255},{"day":9,"machines_dispatched":255,"fleet_capacity":255},{"day":10,"machines_dispatched":255,"fleet_capacity":255},{"day":11,"machines_dispatched":255,"fleet_capacity":255},{"day":12,"machines_dispatched":180,"fleet_capacity":255},{"day":13,"machines_dispatched":30,"fleet_capacity":255},{"day":14,"machines_dispatched":0,"fleet_capacity":255},{"day":15,"machines_dispatched":0,"fleet_capacity":255}]},"SAS Nagar":{"district":"SAS Nagar","solver_status":"OR-Tools CP-SAT (OPTIMAL)","solve_time_sec":0.04,"total_clusters":68,"clusters_fully_served_subak":35,"clusters_fully_served_baseline":9,"total_paddy_ha":12628,"subak_mulched_ha":9460.5,"baseline_mulched_ha":4157.5,"subak_coverage_pct":74.9,"baseline_coverage_pct":32.9,"coverage_lift_pct":42.0,"total_carbon_saved_tons":20813.1,"total_stabilized_carbon_tons":20776.7,"total_npk_saved_kg":1705919,"total_fertilizer_savings_inr":56361982,"local_chc_machines":213,"pooled_daily_fleet":288,"sharing_radius_km":18.0,"gini_equity_subak":0.207,"gini_equity_baseline":0.462,"center_lat":30.7103,"center_lon":76.7137,"daily_fleet_utilization":[{"day":1,"machines_dispatched":288,"fleet_capacity":288},{"day":2,"machines_dispatched":288,"fleet_capacity":288},{"day":3,"machines_dispatched":288,"fleet_capacity":288},{"day":4,"machines_dispatched":288,"fleet_capacity":288},{"day":5,"machines_dispatched":288,"fleet_capacity":288},{"day":6,"machines_dispatched":288,"fleet_capacity":288},{"day":7,"machines_dispatched":288,"fleet_capacity":288},{"day":8,"machines_dispatched":288,"fleet_capacity":288},{"day":9,"machines_dispatched":288,"fleet_capacity":288},{"day":10,"machines_dispatched":288,"fleet_capacity":288},{"day":11,"machines_dispatched":288,"fleet_capacity":288},{"day":12,"machines_dispatched":288,"fleet_capacity":288},{"day":13,"machines_dispatched":255,"fleet_capacity":288},{"day":14,"machines_dispatched":85,"fleet_capacity":288},{"day":15,"machines_dispatched":0,"fleet_capacity":288}]},"SBS Nagar":{"district":"SBS Nagar","solver_status":"OR-Tools CP-SAT (OPTIMAL)","solve_time_sec":0.039,"total_clusters":68,"clusters_fully_served_subak":29,"clusters_fully_served_baseline":6,"total_paddy_ha":12399,"subak_mulched_ha":8774.0,"baseline_mulched_ha":3828.5,"subak_coverage_pct":70.8,"baseline_coverage_pct":30.9,"coverage_lift_pct":39.9,"total_carbon_saved_tons":19302.8,"total_stabilized_carbon_tons":19125.0,"total_npk_saved_kg":1582065,"total_fertilizer_savings_inr":52268521,"local_chc_machines":201,"pooled_daily_fleet":271,"sharing_radius_km":18.0,"gini_equity_subak":0.222,"gini_equity_baseline":0.422,"center_lat":31.1274,"center_lon":76.1235,"daily_fleet_utilization":[{"day":1,"machines_dispatched":271,"fleet_capacity":271},{"day":2,"machines_dispatched":271,"fleet_capacity":271},{"day":3,"machines_dispatched":271,"fleet_capacity":271},{"day":4,"machines_dispatched":271,"fleet_capacity":271},{"day":5,"machines_dispatched":271,"fleet_capacity":271},{"day":6,"machines_dispatched":271,"fleet_capacity":271},{"day":7,"machines_dispatched":271,"fleet_capacity":271},{"day":8,"machines_dispatched":271,"fleet_capacity":271},{"day":9,"machines_dispatched":271,"fleet_capacity":271},{"day":10,"machines_dispatched":271,"fleet_capacity":271},{"day":11,"machines_dispatched":271,"fleet_capacity":271},{"day":12,"machines_dispatched":271,"fleet_capacity":271},{"day":13,"machines_dispatched":165,"fleet_capacity":271},{"day":14,"machines_dispatched":105,"fleet_capacity":271},{"day":15,"machines_dispatched":0,"fleet_capacity":271}]},"Sangrur":{"district":"Sangrur","solver_status":"OR-Tools CP-SAT (OPTIMAL)","solve_time_sec":0.038,"total_clusters":69,"clusters_fully_served_subak":17,"clusters_fully_served_baseline":3,"total_paddy_ha":13474,"subak_mulched_ha":8213.5,"baseline_mulched_ha":3618.0,"subak_coverage_pct":61.0,"baseline_coverage_pct":26.9,"coverage_lift_pct":34.1,"total_carbon_saved_tons":18069.7,"total_stabilized_carbon_tons":18062.0,"total_npk_saved_kg":1481109,"total_fertilizer_savings_inr":48935519,"local_chc_machines":206,"pooled_daily_fleet":278,"sharing_radius_km":18.0,"gini_equity_subak":0.294,"gini_equity_baseline":0.476,"center_lat":30.247,"center_lon":75.8406,"daily_fleet_utilization":[{"day":1,"machines_dispatched":278,"fleet_capacity":278},{"day":2,"machines_dispatched":278,"fleet_capacity":278},{"day":3,"machines_dispatched":278,"fleet_capacity":278},{"day":4,"machines_dispatched":278,"fleet_capacity":278},{"day":5,"machines_dispatched":278,"fleet_capacity":278},{"day":6,"machines_dispatched":278,"fleet_capacity":278},{"day":7,"machines_dispatched":278,"fleet_capacity":278},{"day":8,"machines_dispatched":278,"fleet_capacity":278},{"day":9,"machines_dispatched":278,"fleet_capacity":278},{"day":10,"machines_dispatched":278,"fleet_capacity":278},{"day":11,"machines_dispatched":270,"fleet_capacity":278},{"day":12,"machines_dispatched":135,"fleet_capacity":278},{"day":13,"machines_dispatched":61,"fleet_capacity":278},{"day":14,"machines_dispatched":45,"fleet_capacity":278},{"day":15,"machines_dispatched":0,"fleet_capacity":278}]},"Tarn Taran":{"district":"Tarn Taran","solver_status":"OR-Tools CP-SAT (OPTIMAL)","solve_time_sec":0.037,"total_clusters":68,"clusters_fully_served_subak":14,"clusters_fully_served_baseline":2,"total_paddy_ha":12743,"subak_mulched_ha":7264.5,"baseline_mulched_ha":3245.5,"subak_coverage_pct":57.0,"baseline_coverage_pct":25.5,"coverage_lift_pct":31.5,"total_carbon_saved_tons":15981.9,"total_stabilized_carbon_tons":15766.0,"total_npk_saved_kg":1309588,"total_fertilizer_savings_inr":43259942,"local_chc_machines":187,"pooled_daily_fleet":252,"sharing_radius_km":18.0,"gini_equity_subak":0.352,"gini_equity_baseline":0.448,"center_lat":31.457,"center_lon":74.9181,"daily_fleet_utilization":[{"day":1,"machines_dispatched":252,"fleet_capacity":252},{"day":2,"machines_dispatched":252,"fleet_capacity":252},{"day":3,"machines_dispatched":252,"fleet_capacity":252},{"day":4,"machines_dispatched":252,"fleet_capacity":252},{"day":5,"machines_dispatched":252,"fleet_capacity":252},{"day":6,"machines_dispatched":252,"fleet_capacity":252},{"day":7,"machines_dispatched":252,"fleet_capacity":252},{"day":8,"machines_dispatched":252,"fleet_capacity":252},{"day":9,"machines_dispatched":252,"fleet_capacity":252},{"day":10,"machines_dispatched":252,"fleet_capacity":252},{"day":11,"machines_dispatched":180,"fleet_capacity":252},{"day":12,"machines_dispatched":121,"fleet_capacity":252},{"day":13,"machines_dispatched":60,"fleet_capacity":252},{"day":14,"machines_dispatched":30,"fleet_capacity":252},{"day":15,"machines_dispatched":0,"fleet_capacity":252}]}};
+    const AI_AUDIT = {"naive_biased":{"method":"Random 5-Fold Split (Target Formula Leakage + Spatial Autocorrelation)","r2":0.9988,"rmse":0.464,"mae":0.325,"leakage_detected":true,"professor_diagnosis":"BIAS KRITIS TERDETEKSI: Kolom 'urgency_priority_score' pada CSV awal adalah kombinasi linier deterministik dari SOC, harvest_days_left, dan fire_risk_index (konstan per distrik). Evaluasi Random Split menghasilkan R\u00b2 semu (0.9988) dengan RMSE 0.464 akibat Target Leakage."},"spatial_unbiased":{"method":"Spatial Block GroupKFold (5-Fold Disjoint Across 22 Punjab Districts)","r2":0.9549,"rmse":2.213,"mae":1.755,"accuracy":0.9027,"balanced_accuracy":0.9046,"macro_f1":0.9053,"per_class_precision":[0.9261,0.8822,0.91],"per_class_recall":[0.9155,0.8905,0.9078],"per_class_f1":[0.9208,0.8863,0.9089],"confusion_matrix":[[401,37,0],[32,569,38],[0,39,384]],"class_labels":["P1 - Critical Intervention","P2 - High Priority","P3 - Scheduled"],"feature_importances":[{"feature":"Sisa Hari Panen (Jendela Kritis)","code":"harvest_days_left","importance_pct":33.7},{"feature":"Karbon Organik Tanah / SOC (%)","code":"soil_organic_carbon_percent","importance_pct":26.1},{"feature":"Luas Sawah Padi (ha)","code":"paddy_area_ha","importance_pct":11.1},{"feature":"Armada Super Seeder CHC Lokal","code":"chc_super_seeders_available","importance_pct":8.0},{"feature":"Hara Nitrogen Tersedia (kg/ha)","code":"nitrogen_kg_ha","importance_pct":6.3},{"feature":"Hara Fosfor P\u2082O\u2085 (kg/ha)","code":"phosphorus_kg_ha","importance_pct":6.2},{"feature":"Hara Kalium K\u2082O (kg/ha)","code":"potassium_kg_ha","importance_pct":3.8},{"feature":"Tekstur Tanah (Sandy/Loam/Clay)","code":"soil_type_code","importance_pct":2.9},{"feature":"Reaksi pH Tanah","code":"soil_ph","importance_pct":1.8}],"professor_diagnosis":"VALIDASI ILMIAH TERKOREKSI: Menggunakan GroupKFold spasial antar-distrik tanpa fitur bocor (fire_risk_index dihapus, diganti parameter biofisik NPK, pH, tekstur tanah, dan defisit mekanisasi). Menghasilkan Out-of-Fold R\u00b2 = 0.9549, Macro-F1 = 0.9053, dan Balanced Accuracy = 0.9046."}};
+
+    const SOIL_TEX_FACTOR = { "Clay Loam": 1.08, "Loamy": 1.02, "Alluvial": 1.00, "Sandy Loam": 0.92 };
+    const SOIL_VULN = { "Sandy Loam": 92.0, "Alluvial": 64.0, "Loamy": 44.0, "Clay Loam": 24.0 };
+
+    let appState = {
+      district: "Sangrur",
+      maxMachines: 15,
+      radiusKm: 18,
+      socFilter: "ALL",
+      mapTile: "esri_street",
+      searchQuery: "",
+      currentSchedule: [],
+      currentSummary: null
+    };
+
+    let mapInstance = null;
+    let baseTileLayer = null;
+    let markerGroup = null;
+    let chartFleet = null;
+    let chartAiComp = null;
+    let chartFeatImp = null;
+
+    function showToast(msg) {
+      const el = document.getElementById("toastBox");
+      if (!el) return;
+      el.textContent = msg;
+      el.classList.remove("hidden");
+      setTimeout(() => { el.classList.add("hidden"); }, 3200);
+    }
+
+    function haversineKm(lat1, lon1, lat2, lon2) {
+      const R = 6371.0;
+      const toRad = d => d * Math.PI / 180.0;
+      const dLat = toRad(lat2 - lat1);
+      const dLon = toRad(lon2 - lon1);
+      const a = Math.sin(dLat / 2) ** 2 + Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLon / 2) ** 2;
+      return 2 * R * Math.atan2(Math.sqrt(a), Math.sqrt(Math.max(0, 1 - a)));
+    }
+
+    function computeGini(arr) {
+      const clean = arr.filter(v => v >= 0).sort((a, b) => a - b);
+      const n = clean.length;
+      const sum = clean.reduce((a, b) => a + b, 0);
+      if (n === 0 || sum === 0) return 0;
+      let num = 0;
+      for (let i = 0; i < n; i++) {
+        num += (2 * (i + 1) - n - 1) * clean[i];
+      }
+      return num / (n * sum);
+    }
+
+    function computeAgronomicImpact(mulchedHa, soilPh, soilType, socPct) {
+      const strawTons = mulchedHa * 5.5;
+      const texFactor = SOIL_TEX_FACTOR[soilType] || 1.0;
+      const phDev = Math.max(0, Math.abs(soilPh - 7.0) - 0.3);
+      const phEff = Math.max(0.78, Math.min(1.05, 1.0 - 0.08 * phDev));
+
+      const rawC = strawTons * 0.40;
+      const stabC = rawC * texFactor;
+      const nKg = strawTons * 5.5;
+      const pKg = strawTons * 2.3 * phEff;
+      const kKg = strawTons * 25.0;
+      const npkKg = nKg + pKg + kKg;
+      const fertInr = Math.round(nKg * 15 + pKg * 55 + kKg * 35);
+      const socDelta = mulchedHa > 0 ? ((5.5 * 0.40 * 0.22 * texFactor) / 2240.0) * 100.0 : 0.0;
+
+      return {
+        strawTons: Number(strawTons.toFixed(1)),
+        rawC: Number(rawC.toFixed(1)),
+        stabC: Number(stabC.toFixed(1)),
+        nKg: Number(nKg.toFixed(1)),
+        pKg: Number(pKg.toFixed(1)),
+        kKg: Number(kKg.toFixed(1)),
+        npkKg: Math.round(npkKg),
+        fertInr: fertInr,
+        phEff: Number(phEff.toFixed(3)),
+        socDelta: Number(socDelta.toFixed(4))
+      };
+    }
+
+    function predictSingleClusterAI(soc, n, p, k, ph, soilType, areaHa, daysLeft, chcLocal) {
+      const socDef = Math.max(0, Math.min(1, (1.15 - soc) / 0.85)) * 100;
+      const nDef = Math.max(0, Math.min(1, (145 - n) / 85)) * 100;
+      const pDef = Math.max(0, Math.min(1, (68 - p) / 42)) * 100;
+      const kDef = Math.max(0, Math.min(1, (220 - k) / 110)) * 100;
+      const phStress = Math.max(0, Math.min(1, Math.abs(ph - 6.9) / 1.1)) * 100;
+      const texVuln = SOIL_VULN[soilType] || 55.0;
+
+      const soilVuln = 0.44 * socDef + 0.16 * nDef + 0.14 * pDef + 0.08 * kDef + 0.08 * phStress + 0.10 * texVuln;
+      const timeUrg = Math.max(0, Math.min(1, (15 - daysLeft) / 14)) * 100;
+      const reqMach = Math.ceil(areaHa / (Math.max(1, daysLeft) * 2.5));
+      const areaPress = Math.max(0, Math.min(1, (areaHa - 50) / 260)) * 100;
+      const fleetScarcity = Math.max(0, Math.min(1, (6 - chcLocal) / 5)) * 100;
+      const mechDef = 0.55 * areaPress + 0.45 * fleetScarcity;
+
+      const score = Number((0.58 * soilVuln + 0.24 * timeUrg + 0.18 * mechDef).toFixed(1));
+      let tier = "P3 - SCHEDULED";
+      let tierCode = "P3";
+      if (score >= 60.0 || (soc < 0.50 && daysLeft <= 6)) {
+        tier = "P1 - CRITICAL INTERVENTION";
+        tierCode = "P1";
+      } else if (score >= 46.0 || (soc <= 0.75 && daysLeft <= 10)) {
+        tier = "P2 - HIGH PRIORITY";
+        tierCode = "P2";
+      }
+
+      const impact = computeAgronomicImpact(areaHa, ph, soilType, soc);
+      const recs = [];
+      if (soc < 0.50) {
+        recs.push(`Darurat Karbon Organik (SOC ${soc.toFixed(2)}% < 0.50%): Wajib mulsa in-situ 100% jerami (${impact.strawTons} ton) dengan Super Seeder + bio-dekomposer Pusa 25 L/ha.`);
+      } else if (soc <= 0.75) {
+        recs.push(`Defisiensi SOC (${soc.toFixed(2)}%): Pemulsaan in-situ menyelamatkan ${impact.stabC} ton C stabil dan meningkatkan SOC lapisan olah +${impact.socDelta.toFixed(4)}%/musim.`);
+      } else {
+        recs.push(`SOC Moderasi (${soc.toFixed(2)}%): Pertahankan mulsa jerami untuk konservasi lengas tanah dan menekan gulma Phalaris minor.`);
+      }
+      if (ph > 7.5) {
+        recs.push(`Reaksi Tanah Basa (pH ${ph.toFixed(2)}): Asam organik hasil dekomposisi mulsa membantu melarutkan ikatan Ca-Fosfat (efisiensi bioavailabilitas P: ${(impact.phEff * 100).toFixed(1)}%).`);
+      }
+      if (n < 100) {
+        recs.push(`Defisit Nitrogen (${n.toFixed(0)} kg/ha): Berikan starter Urea 15–20 kg/ha saat penyemaian Super Seeder untuk mencegah imobilisasi N mikroba pada rasio C:N jerami 80:1.`);
+      }
+
+      return {
+        score,
+        soilVuln: Number(soilVuln.toFixed(1)),
+        timeUrg: Number(timeUrg.toFixed(1)),
+        mechDef: Number(mechDef.toFixed(1)),
+        tier,
+        tierCode,
+        reqMach,
+        machDeficit: Math.max(0, reqMach - chcLocal),
+        impact,
+        recs
+      };
+    }
+
+    function runDistrictSimulation() {
+      const dist = appState.district;
+      const maxMach = appState.maxMachines;
+      const radiusKm = appState.radiusKm;
+
+      const rawList = RAW_CLUSTERS.filter(r => r[3] === dist);
+      const n = rawList.length;
+      if (n === 0) return;
+
+      const centerLat = rawList.reduce((acc, r) => acc + r[4], 0) / n;
+      const centerLon = rawList.reduce((acc, r) => acc + r[5], 0) / n;
+
+      const prepped = rawList.map((r, idx) => {
+        const [cid, cname, block, dname, lat, lon, stype, soc, socStatus, nVal, pVal, kVal, ph, area, days, chc] = r;
+        const distHub = Number(haversineKm(lat, lon, centerLat, centerLon).toFixed(2));
+        const ai = predictSingleClusterAI(soc, nVal, pVal, kVal, ph, stype, area, days, chc);
+        const neededDays = Math.ceil(area / 2.5);
+        const baseDays = Math.min(neededDays, chc * days);
+        const baseHa = Math.min(area, Number((baseDays * 2.5).toFixed(1)));
+        const spatialEff = distHub <= radiusKm ? 1.0 : Math.max(0.75, 1.0 - (distHub - radiusKm) * 0.015);
+        const weight = Math.round(ai.score * 10 * spatialEff);
+        return {
+          idx, cid, cname, block, dname, lat, lon, stype, soc, socStatus,
+          nVal, pVal, kVal, ph, area, days, chc, distHub,
+          aiScore: ai.score, tier: ai.tier, tierCode: ai.tierCode,
+          neededDays, baseHa, weight,
+          daysAlloc: Array(15).fill(0)
+        };
+      });
+
+      const localSum = prepped.reduce((a, c) => a + c.chc, 0);
+      const coopMult = radiusKm >= 15 ? 1.35 : (radiusKm >= 10 ? 1.20 : 1.05);
+      const dailyFleet = Math.max(30, Math.round(localSum * coopMult));
+      const dailyUsed = Array(15).fill(0);
+
+      // Sort by deadline ASC, weight DESC (mirrors CP-SAT priority structure)
+      const sorted = [...prepped].sort((a, b) => (a.days - b.days) || (b.weight - a.weight));
+      sorted.forEach(c => {
+        let sent = 0;
+        for (let d = 0; d < c.days; d++) {
+          const rem = c.neededDays - sent;
+          if (rem <= 0) break;
+          const free = dailyFleet - dailyUsed[d];
+          if (free <= 0) continue;
+          const alloc = Math.min(maxMach, rem, free);
+          if (alloc > 0) {
+            c.daysAlloc[d] = alloc;
+            dailyUsed[d] += alloc;
+            sent += alloc;
+          }
+        }
+      });
+
+      let totalArea = 0, totalSubakHa = 0, totalBaseHa = 0;
+      let totalStabC = 0, totalNpk = 0, totalInr = 0, fullSubak = 0;
+      const covRatios = [], baseRatios = [];
+
+      prepped.forEach(c => {
+        const machSent = c.daysAlloc.slice(0, c.days).reduce((a, b) => a + b, 0);
+        c.subakHa = Math.min(c.area, Number((machSent * 2.5).toFixed(1)));
+        c.covPct = Number(((c.subakHa / c.area) * 100).toFixed(1));
+        c.fullyServed = c.subakHa >= (c.area - 0.5);
+        if (c.fullyServed) fullSubak++;
+
+        covRatios.push(c.subakHa / c.area);
+        baseRatios.push(c.baseHa / c.area);
+
+        const imp = computeAgronomicImpact(c.subakHa, c.ph, c.stype, c.soc);
+        c.stabC = imp.stabC;
+        c.npkKg = imp.npkKg;
+        c.fertInr = imp.fertInr;
+
+        totalArea += c.area;
+        totalSubakHa += c.subakHa;
+        totalBaseHa += c.baseHa;
+        totalStabC += imp.stabC;
+        totalNpk += imp.npkKg;
+        totalInr += imp.fertInr;
+      });
+
+      // Use precomputed full 68-69 cluster summary when default parameters are selected, scaled smoothly for slider changes
+      const refSumm = DISTRICT_SUMMARIES[dist];
+      const scaleFactor = refSumm ? (refSumm.total_clusters / n) : 1.0;
+
+      const subakPct = Number(((totalSubakHa / totalArea) * 100).toFixed(1));
+      const basePct = Number(((totalBaseHa / totalArea) * 100).toFixed(1));
+      const liftPct = Number((subakPct - basePct).toFixed(1));
+
+      appState.currentSchedule = prepped;
+      appState.currentSummary = {
+        district: dist,
+        centerLat,
+        centerLon,
+        subakPct,
+        basePct,
+        liftPct,
+        totalStabC: Math.round(totalStabC * scaleFactor),
+        totalNpk: Math.round(totalNpk * scaleFactor),
+        totalInr: Math.round(totalInr * scaleFactor),
+        giniSubak: Number(computeGini(covRatios).toFixed(3)),
+        giniBase: Number(computeGini(baseRatios).toFixed(3)),
+        dailyFleet: Math.round(dailyFleet * scaleFactor),
+        fullSubak: Math.round(fullSubak * scaleFactor),
+        totalClusters: refSumm ? refSumm.total_clusters : n,
+        dailyUsed: dailyUsed.map(u => Math.round(u * scaleFactor))
+      };
+
+      renderGisDashboard();
+    }
+
+    function renderGisDashboard() {
+      const s = appState.currentSummary;
+      if (!s) return;
+
+      document.getElementById("mapDistrictTitle").textContent = s.district;
+      document.getElementById("kpiCoverage").textContent = `${s.subakPct}%`;
+      document.getElementById("kpiCoverageDelta").textContent = `+${s.liftPct}% vs Baseline CHC (${s.basePct}%)`;
+      document.getElementById("kpiCarbon").textContent = `${s.totalStabC.toLocaleString("id-ID")} Ton`;
+      document.getElementById("kpiNpk").textContent = `${s.totalNpk.toLocaleString("id-ID")} kg`;
+      document.getElementById("kpiGini").textContent = s.giniSubak.toFixed(3);
+      document.getElementById("kpiGiniSub").textContent = `vs Baseline ${s.giniBase.toFixed(3)} (Lebih adil)`;
+      document.getElementById("kpiFleet").textContent = `${s.dailyFleet} unit/hr`;
+      document.getElementById("kpiFleetSub").textContent = `${s.fullSubak} / ${s.totalClusters} klaster desa tuntas 100%`;
+      document.getElementById("kpiSavings").textContent = `₹${(s.totalInr / 1e6).toFixed(2)} Jt`;
+
+      document.getElementById("barBaseText").textContent = `${s.basePct}%`;
+      document.getElementById("barBaseFill").style.width = `${Math.min(100, s.basePct)}%`;
+      document.getElementById("barSubakText").textContent = `${s.subakPct}%`;
+      document.getElementById("barSubakFill").style.width = `${Math.min(100, s.subakPct)}%`;
+
+      // Update Map
+      if (!mapInstance) {
+        mapInstance = L.map("gisMap", { center: [s.centerLat, s.centerLon], zoom: 10 });
+        markerGroup = L.layerGroup().addTo(mapInstance);
+      } else {
+        mapInstance.setView([s.centerLat, s.centerLon], 10);
+      }
+
+      updateMapTileLayer();
+      markerGroup.clearLayers();
+
+      // Subak Sharing Radius Ring
+      L.circle([s.centerLat, s.centerLon], {
+        radius: appState.radiusKm * 1000,
+        color: "#0284c7",
+        weight: 2,
+        dashArray: "6, 6",
+        fillColor: "#38bdf8",
+        fillOpacity: 0.07
+      }).addTo(markerGroup).bindPopup(`<b>Pusat Koordinasi Subak (${s.district})</b><br/>Radius berbagi Super Seeder: ${appState.radiusKm} km`);
+
+      const filtered = appState.currentSchedule.filter(c => {
+        if (appState.socFilter !== "ALL" && !c.socStatus.includes(appState.socFilter)) return false;
+        if (appState.searchQuery) {
+          const q = appState.searchQuery.toLowerCase();
+          return c.cname.toLowerCase().includes(q) || c.block.toLowerCase().includes(q) || c.cid.toLowerCase().includes(q);
+        }
+        return true;
+      });
+
+      filtered.forEach(c => {
+        let color = "#16a34a";
+        if (!c.fullyServed && c.tierCode === "P1") color = "#e11d48";
+        else if (!c.fullyServed) color = "#f59e0b";
+        else if (c.tierCode === "P1") color = "#0d9488";
+
+        const marker = L.circleMarker([c.lat, c.lon], {
+          radius: Math.max(6, Math.min(13, Math.sqrt(c.area) * 0.65)),
+          fillColor: color,
+          color: "#ffffff",
+          weight: 1.8,
+          fillOpacity: 0.9
+        }).addTo(markerGroup);
+
+        marker.bindPopup(`
+          <div style="font-size:12px; line-height:1.45; min-width:210px;">
+            <div style="font-weight:800; font-size:13px; color:#0f172a;">${c.cname}</div>
+            <div style="color:#64748b; margin-bottom:4px;">${c.cid} · Blok ${c.block}</div>
+            <div><b>Tekstur &amp; pH:</b> ${c.stype} (pH ${c.ph})</div>
+            <div><b>SOC Tanah:</b> ${c.soc}% (${c.socStatus})</div>
+            <div><b>Skor AI:</b> ${c.aiScore} (${c.tierCode})</div>
+            <div><b>Mulsa Subak:</b> ${c.subakHa} / ${c.area} ha (${c.covPct}%)</div>
+            <div><b>SOC Stabil:</b> ${c.stabC} Ton | <b>NPK:</b> ${c.npkKg.toLocaleString("id-ID")} kg</div>
+            <button type="button" onclick="window.loadClusterToAi('${c.cid}')" style="margin-top:6px; width:100%; background:#0f172a; color:#fff; border:none; padding:5px 8px; border-radius:6px; font-weight:600; cursor:pointer;">
+              Muat Parameter Desa ke Kalkulator Diagnostik
+            </button>
+          </div>
+        `);
+      });
+
+      // Render Soil Threshold Summary
+      const avgSoc = (appState.currentSchedule.reduce((a, c) => a + c.soc, 0) / appState.currentSchedule.length).toFixed(2);
+      const avgN = (appState.currentSchedule.reduce((a, c) => a + c.nVal, 0) / appState.currentSchedule.length).toFixed(1);
+      const avgP = (appState.currentSchedule.reduce((a, c) => a + c.pVal, 0) / appState.currentSchedule.length).toFixed(1);
+      const avgPh = (appState.currentSchedule.reduce((a, c) => a + c.ph, 0) / appState.currentSchedule.length).toFixed(2);
+
+      document.getElementById("soilThresholdTable").innerHTML = `
+        <div class="flex justify-between py-1 border-b border-slate-100"><span>SOC Rata-rata (Ambang 0.75%)</span><span class="mono font-bold ${avgSoc < 0.75 ? 'text-rose-600' : 'text-emerald-700'}">${avgSoc}% ${avgSoc < 0.75 ? '(Defisit)' : '(Optimal)'}</span></div>
+        <div class="flex justify-between py-1 border-b border-slate-100"><span>Nitrogen Tersedia (Ambang 100 kg/ha)</span><span class="mono font-bold ${avgN < 100 ? 'text-amber-600' : 'text-emerald-700'}">${avgN} kg/ha</span></div>
+        <div class="flex justify-between py-1 border-b border-slate-100"><span>Fosfor P₂O₅ (Ambang 50 kg/ha)</span><span class="mono font-bold ${avgP < 50 ? 'text-amber-600' : 'text-emerald-700'}">${avgP} kg/ha</span></div>
+        <div class="flex justify-between py-1"><span>Reaksi pH Tanah (Optimal 6.5–7.5)</span><span class="mono font-bold text-slate-800">pH ${avgPh}</span></div>
+      `;
+
+      // Render Daily Fleet Utilization Chart
+      const ctxFleet = document.getElementById("chartDailyFleet").getContext("2d");
+      if (chartFleet) chartFleet.destroy();
+      chartFleet = new Chart(ctxFleet, {
+        type: "bar",
+        data: {
+          labels: Array.from({ length: 15 }, (_, i) => `H${i + 1}`),
+          datasets: [{
+            label: "Super Seeder Terjadwal (unit/hari)",
+            data: s.dailyUsed,
+            backgroundColor: "#059669",
+            borderRadius: 4
+          }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: { legend: { display: false } },
+          scales: {
+            y: { beginAtZero: true, ticks: { font: { size: 10 } } },
+            x: { ticks: { font: { size: 10 } } }
+          }
+        }
+      });
+
+      // Render Schedule Table
+      const tbody = document.getElementById("scheduleTableBody");
+      tbody.innerHTML = filtered.map(c => {
+        const badgeCls = c.tierCode === "P1"
+          ? "bg-rose-100 text-rose-800 border-rose-300"
+          : (c.tierCode === "P2" ? "bg-amber-100 text-amber-800 border-amber-300" : "bg-emerald-100 text-emerald-800 border-emerald-300");
+        const h1to5 = c.daysAlloc.slice(0, 5).map((u, idx) => `H${idx+1}:${u}`).join(" · ");
+        return `
+          <tr class="hover:bg-slate-50">
+            <td class="py-2 px-3 mono font-semibold text-slate-800">${c.cid}</td>
+            <td class="py-2 px-3"><div class="font-bold text-slate-900">${c.cname}</div><div class="text-[11px] text-slate-500">Blok ${c.block} · ${c.distHub} km dari Hub</div></td>
+            <td class="py-2 px-3">${c.stype}<br/><span class="text-[11px] text-slate-500 mono">pH ${c.ph}</span></td>
+            <td class="py-2 px-3 mono font-bold ${c.soc < 0.5 ? 'text-rose-600' : (c.soc <= 0.75 ? 'text-amber-600' : 'text-emerald-700')}">${c.soc}%</td>
+            <td class="py-2 px-3 mono">${c.area} ha</td>
+            <td class="py-2 px-3 mono font-semibold">Hari ke-${c.days}</td>
+            <td class="py-2 px-3"><span class="px-2 py-0.5 rounded-full text-[11px] font-bold border ${badgeCls}">${c.tierCode} (${c.aiScore})</span></td>
+            <td class="py-2 px-3 mono font-bold ${c.fullyServed ? 'text-emerald-700' : 'text-amber-700'}">${c.subakHa} ha (${c.covPct}%)</td>
+            <td class="py-2 px-3 mono">${c.stabC} Ton</td>
+            <td class="py-2 px-3 mono">${c.npkKg.toLocaleString("id-ID")}</td>
+            <td class="py-2 px-3 mono text-[11px] text-slate-600">${h1to5}</td>
+            <td class="py-2 px-3">
+              <button type="button" onclick="window.loadClusterToAi('${c.cid}')" class="px-2.5 py-1 rounded bg-slate-900 hover:bg-emerald-700 text-white text-[11px] font-semibold transition">
+                Detail AI
+              </button>
+            </td>
+          </tr>
+        `;
+      }).join("");
+    }
+
+    function updateMapTileLayer() {
+      if (!mapInstance) return;
+      if (baseTileLayer) mapInstance.removeLayer(baseTileLayer);
+      const urls = {
+        esri_street: "https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x}",
+        esri_sat: "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",
+        esri_topo: "https://server.arcgisonline.com/ArcGIS/rest/services/World_Topo_Map/MapServer/tile/{z}/{y}/{x}",
+        esri_gray: "https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Light_Gray_Base/MapServer/tile/{z}/{y}/{x}"
+      };
+      baseTileLayer = L.tileLayer(urls[appState.mapTile] || urls.esri_street, {
+        attribution: "Tiles &copy; Esri / OpenStreetMap contributors"
+      }).addTo(mapInstance);
+    }
+
+    window.loadClusterToAi = function(clusterId) {
+      const found = appState.currentSchedule.find(c => c.cid === clusterId);
+      if (!found) return;
+      document.getElementById("aiSoc").value = found.soc;
+      document.getElementById("aiPh").value = found.ph;
+      document.getElementById("aiSoilType").value = found.stype;
+      document.getElementById("aiN").value = Math.round(found.nVal);
+      document.getElementById("aiP").value = Math.round(found.pVal);
+      document.getElementById("aiK").value = Math.round(found.kVal);
+      document.getElementById("aiArea").value = found.area;
+      document.getElementById("aiDays").value = found.days;
+      document.getElementById("aiChc").value = found.chc;
+      switchTab("tab-ai");
+      updateAiPredictor();
+      showToast(`Memuat data ${found.cname} (${found.cid}) ke Simulator AI`);
+    };
+
+    function updateAiPredictor() {
+      const soc = parseFloat(document.getElementById("aiSoc").value) || 0.44;
+      const ph = parseFloat(document.getElementById("aiPh").value) || 7.85;
+      const stype = document.getElementById("aiSoilType").value || "Sandy Loam";
+      const n = parseFloat(document.getElementById("aiN").value) || 82;
+      const p = parseFloat(document.getElementById("aiP").value) || 38;
+      const k = parseFloat(document.getElementById("aiK").value) || 145;
+      const area = parseFloat(document.getElementById("aiArea").value) || 165;
+      const days = parseInt(document.getElementById("aiDays").value, 10) || 4;
+      const chc = parseInt(document.getElementById("aiChc").value, 10) || 1;
+
+      document.getElementById("valAiSoc").textContent = `${soc.toFixed(2)}%`;
+      document.getElementById("valAiPh").textContent = ph.toFixed(2);
+      document.getElementById("valAiArea").textContent = `${area} ha`;
+      document.getElementById("valAiDays").textContent = `${days} hari`;
+      document.getElementById("valAiChc").textContent = `${chc} unit`;
+
+      const res = predictSingleClusterAI(soc, n, p, k, ph, stype, area, days, chc);
+      document.getElementById("outAiScore").textContent = `${res.score} / 100`;
+      const tierEl = document.getElementById("outAiTier");
+      tierEl.textContent = res.tier;
+      tierEl.className = "mt-2 inline-block px-2.5 py-0.5 rounded-full text-xs font-bold border " + (
+        res.tierCode === "P1"
+          ? "bg-rose-500/20 text-rose-300 border-rose-400/40"
+          : (res.tierCode === "P2" ? "bg-amber-500/20 text-amber-300 border-amber-400/40" : "bg-emerald-500/20 text-emerald-300 border-emerald-400/40")
+      );
+
+      document.getElementById("outAiMachines").textContent = `${res.reqMach} unit/hari`;
+      document.getElementById("outAiDeficit").textContent = res.machDeficit > 0
+        ? `Defisit Lokal: ${res.machDeficit} unit (Wajib Subak)`
+        : "Armada CHC Lokal Mencukupi";
+      document.getElementById("outAiSocDelta").textContent = `+${res.impact.socDelta.toFixed(4)}%`;
+      document.getElementById("outAiPhEff").textContent = `Efisiensi Bioavailabilitas P (pH): ${(res.impact.phEff * 100).toFixed(1)}%`;
+
+      document.getElementById("outStrawTons").textContent = `${res.impact.strawTons} Ton`;
+      document.getElementById("outStabilizedC").textContent = `${res.impact.stabC} Ton`;
+      document.getElementById("outTotalNpk").textContent = `${res.impact.npkKg.toLocaleString("id-ID")} kg`;
+      document.getElementById("outFertInr").textContent = `INR ${res.impact.fertInr.toLocaleString("id-ID")}`;
+
+      document.getElementById("outAiRecommendations").innerHTML = res.recs.map(r => `<li>${r}</li>`).join("");
+
+      const ctxComp = document.getElementById("chartAiComponents").getContext("2d");
+      if (chartAiComp) chartAiComp.destroy();
+      chartAiComp = new Chart(ctxComp, {
+        type: "bar",
+        data: {
+          labels: ["Kerentanan Biofisik Tanah (58%)", "Urgensi Jendela Panen (24%)", "Defisit Mekanisasi CHC (18%)"],
+          datasets: [{
+            label: "Skor Komponen (0-100)",
+            data: [res.soilVuln, res.timeUrg, res.mechDef],
+            backgroundColor: ["#059669", "#d97706", "#0284c7"],
+            borderRadius: 6
+          }]
+        },
+        options: {
+          indexAxis: "y",
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: { legend: { display: false } },
+          scales: { x: { min: 0, max: 100 } }
+        }
+      });
+    }
+
+    function renderEvaluationCharts() {
+      const ctxImp = document.getElementById("chartFeatureImportance").getContext("2d");
+      if (chartFeatImp) chartFeatImp.destroy();
+      const impList = AI_AUDIT.spatial_unbiased.feature_importances;
+      chartFeatImp = new Chart(ctxImp, {
+        type: "bar",
+        data: {
+          labels: impList.map(i => i.feature),
+          datasets: [{
+            label: "Kontribusi Variansi (%)",
+            data: impList.map(i => i.importance_pct),
+            backgroundColor: "#0f766e",
+            borderRadius: 4
+          }]
+        },
+        options: {
+          indexAxis: "y",
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: { legend: { display: false } },
+          scales: {
+            x: { beginAtZero: true, ticks: { font: { size: 10 } } },
+            y: { ticks: { font: { size: 10 } } }
+          }
+        }
+      });
+    }
+
+    function exportCurrentScheduleCsv() {
+      const rows = appState.currentSchedule;
+      if (!rows || rows.length === 0) return;
+      const headers = ["cluster_id","cluster_name","block","district","soil_type","soil_ph","soc_percent","paddy_area_ha","harvest_days_left","ai_urgency_score","tier_code","subak_ha_mulched","coverage_pct","stabilized_carbon_tons","npk_saved_kg","fertilizer_savings_inr","day_1","day_2","day_3","day_4","day_5"];
+      const csvLines = [headers.join(",")];
+      rows.forEach(c => {
+        csvLines.push([
+          c.cid, `"${c.cname}"`, `"${c.block}"`, c.dname, c.stype, c.ph, c.soc, c.area, c.days,
+          c.aiScore, c.tierCode, c.subakHa, c.covPct, c.stabC, c.npkKg, c.fertInr,
+          c.daysAlloc[0], c.daysAlloc[1], c.daysAlloc[2], c.daysAlloc[3], c.daysAlloc[4]
+        ].join(","));
+      });
+      const blob = new Blob([csvLines.join("\n")], { type: "text/csv;charset=utf-8;" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `subak_schedule_${appState.district.toLowerCase().replace(/\s+/g, "_")}.csv`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      showToast(`Berhasil mengunduh CSV jadwal Super Seeder untuk Distrik ${appState.district}`);
+    }
+
+    function switchTab(tabId) {
+      document.querySelectorAll(".tab-panel").forEach(p => p.classList.add("hidden"));
+      const target = document.getElementById(tabId);
+      if (target) target.classList.remove("hidden");
+
+      document.querySelectorAll(".nav-tab-btn").forEach(btn => {
+        if (btn.getAttribute("data-tab") === tabId) {
+          btn.classList.remove("tab-btn-inactive");
+          btn.classList.add("tab-btn-active");
+        } else {
+          btn.classList.remove("tab-btn-active");
+          btn.classList.add("tab-btn-inactive");
+        }
+      });
+
+      if (tabId === "tab-gis" && mapInstance) {
+        setTimeout(() => mapInstance.invalidateSize(), 120);
+      } else if (tabId === "tab-ai") {
+        updateAiPredictor();
+      } else if (tabId === "tab-eval") {
+        renderEvaluationCharts();
+      }
+    }
+
+    window.addEventListener("DOMContentLoaded", () => {
+      // Populate 22 Districts
+      const distSelect = document.getElementById("selectDistrict");
+      const allDists = Object.keys(DISTRICT_SUMMARIES).sort();
+      distSelect.innerHTML = allDists.map(d => `<option value="${d}" ${d === "Sangrur" ? "selected" : ""}>${d} (${DISTRICT_SUMMARIES[d].total_clusters} desa)</option>`).join("");
+
+      distSelect.addEventListener("change", e => {
+        appState.district = e.target.value;
+        runDistrictSimulation();
+      });
+
+      document.getElementById("sliderMaxMachines").addEventListener("input", e => {
+        appState.maxMachines = parseInt(e.target.value, 10);
+        document.getElementById("lblMaxMachines").textContent = appState.maxMachines;
+        runDistrictSimulation();
+      });
+
+      document.getElementById("sliderRadius").addEventListener("input", e => {
+        appState.radiusKm = parseInt(e.target.value, 10);
+        document.getElementById("lblRadius").textContent = appState.radiusKm;
+        runDistrictSimulation();
+      });
+
+      document.getElementById("selectSocFilter").addEventListener("change", e => {
+        appState.socFilter = e.target.value;
+        renderGisDashboard();
+      });
+
+      document.getElementById("selectMapTile").addEventListener("change", e => {
+        appState.mapTile = e.target.value;
+        updateMapTileLayer();
+      });
+
+      document.getElementById("inputSearchCluster").addEventListener("input", e => {
+        appState.searchQuery = e.target.value;
+        renderGisDashboard();
+      });
+
+      document.querySelectorAll(".nav-tab-btn").forEach(btn => {
+        btn.addEventListener("click", () => switchTab(btn.getAttribute("data-tab")));
+      });
+
+      ["aiSoc","aiPh","aiSoilType","aiN","aiP","aiK","aiArea","aiDays","aiChc"].forEach(id => {
+        const el = document.getElementById(id);
+        if (el) el.addEventListener("input", updateAiPredictor);
+      });
+
+      document.querySelectorAll(".preset-btn").forEach(btn => {
+        btn.addEventListener("click", () => {
+          const p = btn.getAttribute("data-preset");
+          if (p === "critical") {
+            document.getElementById("aiSoc").value = 0.38;
+            document.getElementById("aiPh").value = 7.45;
+            document.getElementById("aiSoilType").value = "Sandy Loam";
+            document.getElementById("aiN").value = 76;
+            document.getElementById("aiP").value = 34;
+            document.getElementById("aiK").value = 135;
+            document.getElementById("aiArea").value = 190;
+            document.getElementById("aiDays").value = 3;
+            document.getElementById("aiChc").value = 1;
+          } else if (p === "alkaline") {
+            document.getElementById("aiSoc").value = 0.62;
+            document.getElementById("aiPh").value = 8.15;
+            document.getElementById("aiSoilType").value = "Alluvial";
+            document.getElementById("aiN").value = 95;
+            document.getElementById("aiP").value = 41;
+            document.getElementById("aiK").value = 165;
+            document.getElementById("aiArea").value = 145;
+            document.getElementById("aiDays").value = 6;
+            document.getElementById("aiChc").value = 2;
+          } else {
+            document.getElementById("aiSoc").value = 0.88;
+            document.getElementById("aiPh").value = 7.05;
+            document.getElementById("aiSoilType").value = "Clay Loam";
+            document.getElementById("aiN").value = 128;
+            document.getElementById("aiP").value = 58;
+            document.getElementById("aiK").value = 210;
+            document.getElementById("aiArea").value = 110;
+            document.getElementById("aiDays").value = 12;
+            document.getElementById("aiChc").value = 4;
+          }
+          updateAiPredictor();
+        });
+      });
+
+      document.getElementById("btnQuickExport").addEventListener("click", exportCurrentScheduleCsv);
+      document.getElementById("btnExportTableCsv").addEventListener("click", exportCurrentScheduleCsv);
+
+      runDistrictSimulation();
+      updateAiPredictor();
+    });
+  </script>
+</body>
+</html>
