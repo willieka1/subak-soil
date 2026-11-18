@@ -1,4 +1,7 @@
 import os
+import sys
+import csv
+
 import pandas as pd
 import pydeck as pdk
 import streamlit as st
@@ -6,38 +9,38 @@ from subak_soil_scheduler import solve_subak_schedule
 
 st.set_page_config(page_title="SUBAK-SOIL | Soil Nutrient Synchronizer", layout="wide")
 st.title("SUBAK-SOIL: In-Situ Soil Carbon & Mulching Synchronizer")
-st.caption("Sinkronisasi giliran mesin Super Seeder berbasis algoritma Subak Bali & Google OR-Tools untuk penyelamatan Karbon Organik Tanah (SOC) dan NPK di India.")
+st.caption(
+    "Sinkronisasi giliran mesin Super Seeder berbasis algoritma Subak Bali "
+    "untuk penyelamatan Karbon Organik Tanah (SOC) dan NPK di Punjab, India."
+)
 
 @st.cache_data
 def load_dataset():
-    paths = [
+    for path in [
         "subak_soil_datasheet.csv",
         os.path.join(os.path.dirname(__file__), "subak_soil_datasheet.csv"),
-        "subak-soil-app/subak_soil_datasheet.csv",
-        "../subak_soil_datasheet.csv"
-    ]
-    for p in paths:
-        if os.path.exists(p):
-            return pd.read_csv(p)
-    return pd.read_csv("subak_soil_datasheet.csv")
+    ]:
+        if os.path.exists(path):
+            return pd.read_csv(path)
+    raise FileNotFoundError("subak_soil_datasheet.csv not found")
 
 df = load_dataset()
 
-# Sidebar Kontrol Simulasi
+# ── Sidebar ──────────────────────────────────────────────────────────────────
 st.sidebar.header("Parameter Penjadwalan Subak")
 districts = sorted(df["district"].unique())
-default_index = districts.index("Sangrur") if "Sangrur" in districts else 0
-selected_district = st.sidebar.selectbox("Pilih Distrik Target:", districts, index=default_index)
-max_per_cluster = st.sidebar.slider("Maksimum Mesin per Desa/Hari:", min_value=5, max_value=25, value=15)
+default_idx = districts.index("Sangrur") if "Sangrur" in districts else 0
+selected_district = st.sidebar.selectbox("Pilih Distrik Target:", districts, index=default_idx)
+max_per_cluster = st.sidebar.slider("Maksimum Mesin per Desa/Hari:", 5, 25, 15)
 
-# Jalankan Solver OR-Tools secara Real-Time
+# ── Run solver ────────────────────────────────────────────────────────────────
 schedule_df, summary = solve_subak_schedule(
     df,
     district=selected_district,
     max_machines_per_cluster_day=max_per_cluster,
 )
 
-# Baris 1: 4 Kartu Metrik Utama (Fokus Tanah)
+# ── 4 Metric Cards ────────────────────────────────────────────────────────────
 col1, col2, col3, col4 = st.columns(4)
 col1.metric(
     "Lahan Termulsa Tepat Waktu",
@@ -52,7 +55,7 @@ col2.metric(
 col3.metric(
     "Total Hara NPK Kembali ke Tanah",
     f"{summary['total_npk_saved_kg']:,.0f} kg",
-    "N + P2O5 + K2O In-Situ",
+    "N + P₂O₅ + K₂O In-Situ",
 )
 col4.metric(
     "Penghematan Pupuk Kimia Petani",
@@ -60,14 +63,16 @@ col4.metric(
     f"Solver: {summary['solver_status']} ({summary['solve_time_sec']} dtk)",
 )
 
-# Gabungkan koordinat untuk peta PyDeck
+# ── Map ───────────────────────────────────────────────────────────────────────
 coords = df[df["district"] == selected_district][["cluster_id", "latitude", "longitude"]]
 map_df = schedule_df.merge(coords, on="cluster_id", how="left")
-map_df["color_r"] = map_df["fully_served"].apply(lambda v: 22 if v else 180)
-map_df["color_g"] = map_df["fully_served"].apply(lambda v: 101 if v else 52)
-map_df["color_b"] = map_df["fully_served"].apply(lambda v: 52 if v else 18)
+map_df["color_r"] = map_df["fully_served"].apply(lambda v: 22 if v else 220)
+map_df["color_g"] = map_df["fully_served"].apply(lambda v: 160 if v else 55)
+map_df["color_b"] = map_df["fully_served"].apply(lambda v: 52 if v else 20)
 
 st.subheader(f"Peta Sinkronisasi Tanah & Mesin Mulsa — Distrik {selected_district}")
+st.caption("🟢 Desa Tuntas Terlayani &nbsp;&nbsp; 🔴 Desa Perlu Tambahan Mesin")
+
 layer = pdk.Layer(
     "ScatterplotLayer",
     data=map_df,
@@ -84,15 +89,30 @@ view_state = pdk.ViewState(
 st.pydeck_chart(pdk.Deck(
     layers=[layer],
     initial_view_state=view_state,
-    tooltip={"text": "{cluster_name}\nSOC: {soc_percent}% ({soc_status})\nLahan Termulsa: {subak_ha_mulched} / {paddy_area_ha} ha\nKarbon Diselamatkan: {carbon_saved_tons} ton"},
+    tooltip={
+        "text": (
+            "{cluster_name}\n"
+            "SOC: {soc_percent}% ({soc_status})\n"
+            "Lahan Termulsa: {subak_ha_mulched} / {paddy_area_ha} ha\n"
+            "Karbon Diselamatkan: {carbon_saved_tons} ton\n"
+            "NPK Kembali: {npk_saved_kg} kg"
+        )
+    },
 ))
 
-st.subheader("Jadwal Harian Mesin Super Seeder (Hari 1 s.d. Hari 15) & Kalkulator Hara")
-st.dataframe(schedule_df, use_container_width=True)
+# ── Schedule Table + Download ─────────────────────────────────────────────────
+st.subheader("Jadwal Harian Super Seeder (Hari 1–15) & Kalkulator Hara")
+# Show compact view: drop raw day columns from table display
+display_cols = [c for c in schedule_df.columns if not c.startswith("day_")]
+st.dataframe(schedule_df[display_cols], use_container_width=True)
+
+with st.expander("Lihat Jadwal Harian Lengkap (Hari 1 s.d. 15)"):
+    st.dataframe(schedule_df, use_container_width=True)
+
 csv_bytes = schedule_df.to_csv(index=False).encode("utf-8")
 st.download_button(
-    label=f"Unduh Jadwal Subak Distrik {selected_district} (CSV)",
+    label=f"⬇️ Unduh Jadwal Subak Distrik {selected_district} (CSV)",
     data=csv_bytes,
-    file_name=f"subak_schedule_{selected_district.lower()}.csv",
+    file_name=f"subak_schedule_{selected_district.lower().replace(' ', '_')}.csv",
     mime="text/csv",
 )
