@@ -267,7 +267,7 @@ st.caption("Jadwal alokasi armada CHC per klaster desa selama 15 hari jendela kr
 
 display_cols = [c for c in schedule_df.columns if not c.startswith("day_")]
 st.dataframe(
-    schedule_df[display_cols].style.applymap(
+    schedule_df[display_cols].style.map(
         lambda v: "background-color: #d4edda; color: #155724;" if v is True else
                   ("background-color: #f8d7da; color: #721c24;" if v is False else ""),
         subset=["fully_served"]
